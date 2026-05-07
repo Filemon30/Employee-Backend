@@ -1,0 +1,136 @@
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "library"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model attendances {
+  attendance_id   Int                    @id
+  employee_id     Int
+  attendance_date DateTime               @default(dbgenerated("CURRENT_DATE")) @db.Date
+  time_in         DateTime?              @db.Time(6)
+  time_out        DateTime?              @db.Time(6)
+  status          attendance_status_enum
+  employees       employees              @relation(fields: [employee_id], references: [employee_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([employee_id, attendance_date])
+  @@index([employee_id, attendance_date], map: "idx_attendance_employee_date")
+}
+
+model cards {
+  card_id     Int        @id
+  card_number String     @unique @db.VarChar(120)
+  employees   employees?
+}
+
+model departments {
+  department_id   Int            @id
+  department_name String         @unique @db.VarChar(80)
+  positions       positions[]
+  transactions    transactions[]
+}
+
+model employees {
+  employee_id                                        Int               @id
+  position_id                                        Int
+  card_id                                            Int               @unique
+  acc_id                                             Int               @unique
+  info_id                                            Int               @unique
+  work_hour_id                                       Int
+  attendances                                        attendances[]
+  user_accounts                                      user_accounts     @relation(fields: [acc_id], references: [acc_id], onDelete: Cascade, onUpdate: NoAction)
+  cards                                              cards             @relation(fields: [card_id], references: [card_id], onDelete: Cascade, onUpdate: NoAction)
+  user_informations                                  user_informations @relation(fields: [info_id], references: [info_id], onDelete: Cascade, onUpdate: NoAction)
+  positions                                          positions         @relation(fields: [position_id], references: [position_id], onDelete: NoAction, onUpdate: NoAction)
+  work_hours                                         work_hours        @relation(fields: [work_hour_id], references: [work_hour_id], onDelete: NoAction, onUpdate: NoAction)
+  transactions_transactions_employee_idToemployees   transactions[]    @relation("transactions_employee_idToemployees")
+  transactions_transactions_transacted_byToemployees transactions[]    @relation("transactions_transacted_byToemployees")
+}
+
+model positions {
+  position_id   Int            @id
+  department_id Int
+  salary_id     Int
+  position_name String         @db.VarChar(80)
+  employees     employees[]
+  departments   departments    @relation(fields: [department_id], references: [department_id], onDelete: Cascade, onUpdate: NoAction)
+  salaries      salaries       @relation(fields: [salary_id], references: [salary_id], onDelete: NoAction, onUpdate: NoAction)
+  transactions  transactions[]
+
+  @@unique([department_id, position_name])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model salaries {
+  salary_id    Int            @id
+  amount       Decimal        @db.Decimal(10, 2)
+  positions    positions[]
+  transactions transactions[]
+}
+
+model transactions {
+  transaction_id                                  Int          @id
+  transaction_type                                String       @db.VarChar(80)
+  transacted_by                                   Int
+  reference_type                                  String       @db.VarChar(30)
+  department_id                                   Int?
+  position_id                                     Int?
+  salary_id                                       Int?
+  work_hour_id                                    Int?
+  employee_id                                     Int?
+  transaction_date                                DateTime?    @default(now()) @db.Timestamp(6)
+  department                                      departments? @relation(fields: [department_id], references: [department_id], onDelete: NoAction, onUpdate: NoAction)
+  employees_transactions_employee_idToemployees   employees?   @relation("transactions_employee_idToemployees", fields: [employee_id], references: [employee_id], onDelete: NoAction, onUpdate: NoAction)
+  position                                        positions?   @relation(fields: [position_id], references: [position_id], onDelete: NoAction, onUpdate: NoAction)
+  salary                                          salaries?    @relation(fields: [salary_id], references: [salary_id], onDelete: NoAction, onUpdate: NoAction)
+  employees_transactions_transacted_byToemployees employees    @relation("transactions_transacted_byToemployees", fields: [transacted_by], references: [employee_id], onDelete: NoAction, onUpdate: NoAction)
+  work_hour                                       work_hours?  @relation(fields: [work_hour_id], references: [work_hour_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([transaction_date], map: "idx_transaction_date")
+}
+
+model user_accounts {
+  acc_id    Int        @id
+  username  String     @unique @db.VarChar(50)
+  password  String
+  employees employees?
+}
+
+model user_informations {
+  info_id        Int         @id
+  first_name     String      @db.VarChar(50)
+  middle_name    String?     @db.VarChar(50)
+  last_name      String      @db.VarChar(50)
+  gender         gender_enum
+  birthdate      DateTime    @db.Date
+  province       String      @db.VarChar(200)
+  city           String      @db.VarChar(200)
+  barangay       String      @db.VarChar(200)
+  zip_code       String      @db.VarChar(20)
+  contact_number String      @db.VarChar(20)
+  employees      employees?
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model work_hours {
+  work_hour_id Int            @id
+  time_in      String         @db.VarChar(20)
+  time_out     String         @db.VarChar(20)
+  employees    employees[]
+  transactions transactions[]
+}
+
+enum attendance_status_enum {
+  Present
+  Late
+  Absent
+  Leave
+}
+
+enum gender_enum {
+  Male
+  Female
+}
