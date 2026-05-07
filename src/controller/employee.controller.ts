@@ -228,6 +228,7 @@ export const updateEmployee = asyncHandler(
 
     await prisma.$transaction(async (tx) => {
       const employeeData: Prisma.employeesUncheckedUpdateInput = {};
+      let handledUpdate = false;
 
       if (update_type === "Position") {
         if (position_id === undefined) {
@@ -253,6 +254,7 @@ export const updateEmployee = asyncHandler(
         }
 
         employeeData.position_id = position_id;
+        handledUpdate = true;
       }
 
       if (update_type === "Card") {
@@ -299,6 +301,7 @@ export const updateEmployee = asyncHandler(
         }
 
         employeeData.card_id = cardId;
+        handledUpdate = true;
       }
 
       if (update_type === "Password") {
@@ -318,9 +321,11 @@ export const updateEmployee = asyncHandler(
             password: newPassword,
           },
         });
+
+        handledUpdate = true;
       }
 
-      if (Object.keys(employeeData).length === 0) {
+      if (!handledUpdate) {
         throw new AppError(
           "Invalid update type. Use Password, Position, or Card.",
           400
