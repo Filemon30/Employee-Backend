@@ -41,6 +41,13 @@ export class UserAccountModel {
     });
   }
 
+  static findByUsername(username: string) {
+    return prisma.user_accounts.findUnique({
+      where: { username },
+      include: { employees: true },
+    });
+  }
+
   static updateById(accId: number, data: UpdateUserAccountInput) {
     return prisma.user_accounts.update({
       where: { acc_id: accId },

@@ -50,6 +50,7 @@ CREATE TABLE user_informations(
     barangay VARCHAR(200) NOT NULL,
     zip_code VARCHAR(20) NOT NULL,
     contact_number VARCHAR(20) NOT NULL
+    suffix VARCHAR(20),
 );
 
 CREATE TABLE work_hours(

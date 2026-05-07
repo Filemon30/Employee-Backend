@@ -6,6 +6,7 @@ export type CreateUserInformationInput = {
   first_name: string;
   middle_name?: string;
   last_name: string;
+  suffix?: string;
   gender: Gender;
   birthdate: Date;
   province: string;

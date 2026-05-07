@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "work_hours" ALTER COLUMN "time_in" SET DATA TYPE VARCHAR(20),
+ALTER COLUMN "time_out" SET DATA TYPE VARCHAR(20);

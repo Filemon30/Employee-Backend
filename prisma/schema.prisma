@@ -36,13 +36,13 @@ model departments {
 model employees {
   employee_id                                        Int               @id
   position_id                                        Int
-  card_id                                            Int               @unique
+  card_id                                            Int?              @unique
   acc_id                                             Int               @unique
   info_id                                            Int               @unique
   work_hour_id                                       Int
   attendances                                        attendances[]
   user_accounts                                      user_accounts     @relation(fields: [acc_id], references: [acc_id], onDelete: Cascade, onUpdate: NoAction)
-  cards                                              cards             @relation(fields: [card_id], references: [card_id], onDelete: Cascade, onUpdate: NoAction)
+  cards                                              cards?            @relation(fields: [card_id], references: [card_id], onDelete: Cascade, onUpdate: NoAction)
   user_informations                                  user_informations @relation(fields: [info_id], references: [info_id], onDelete: Cascade, onUpdate: NoAction)
   positions                                          positions         @relation(fields: [position_id], references: [position_id], onDelete: NoAction, onUpdate: NoAction)
   work_hours                                         work_hours        @relation(fields: [work_hour_id], references: [work_hour_id], onDelete: NoAction, onUpdate: NoAction)
@@ -104,6 +104,7 @@ model user_informations {
   first_name     String      @db.VarChar(50)
   middle_name    String?     @db.VarChar(50)
   last_name      String      @db.VarChar(50)
+  suffix         String?     @db.VarChar(20)
   gender         gender_enum
   birthdate      DateTime    @db.Date
   province       String      @db.VarChar(200)

@@ -39,7 +39,7 @@ CREATE TABLE "departments" (
 CREATE TABLE "employees" (
     "employee_id" INTEGER NOT NULL,
     "position_id" INTEGER NOT NULL,
-    "card_id" INTEGER NOT NULL,
+    "card_id" INTEGER,
     "acc_id" INTEGER NOT NULL,
     "info_id" INTEGER NOT NULL,
     "work_hour_id" INTEGER NOT NULL,
@@ -103,6 +103,7 @@ CREATE TABLE "user_informations" (
     "barangay" VARCHAR(200) NOT NULL,
     "zip_code" VARCHAR(20) NOT NULL,
     "contact_number" VARCHAR(20) NOT NULL,
+    "suffix" VARCHAR(20),
 
     CONSTRAINT "user_informations_pkey" PRIMARY KEY ("info_id")
 );
