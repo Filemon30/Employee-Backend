@@ -3,7 +3,12 @@ CREATE TYPE attendance_status_enum AS ENUM ('Present','Late','Absent','Leave');
 
 CREATE TABLE departments(
     department_id INT PRIMARY KEY,
-    department_name VARCHAR(80) UNIQUE NOT NULL
+    department_name VARCHAR(80) UNIQUE NOT NULL,
+    department_head INT,
+
+    FOREIGN KEY (department_head)
+        REFERENCES employees(employee_id)
+        ON DELETE SET NULL
 );
 
 CREATE TABLE salaries(
@@ -49,7 +54,7 @@ CREATE TABLE user_informations(
     city VARCHAR(200) NOT NULL,
     barangay VARCHAR(200) NOT NULL,
     zip_code VARCHAR(20) NOT NULL,
-    contact_number VARCHAR(20) NOT NULL
+    contact_number VARCHAR(20) NOT NULL,
     suffix VARCHAR(20),
 );
 
@@ -143,3 +148,21 @@ CREATE INDEX idx_transaction_date
 ON transactions(transaction_date);
 
 
+{
+      "department_id": 1,
+      "position_id": 2,
+      "work_hour_id": 1,
+      "first_name": "Filemon",
+      "middle_name": "Galanida",
+      "last_name": "Leornas",
+      "suffix": "Jr.",
+      "gender": "Male",
+      "birthdate": "12/30/2001",
+      "province": "Bukidnon",
+      "city": "Malaybalay City",
+      "barangay": "Brgy 1",
+      "zip_code": "8700",
+      "contact_number": "12345678901",
+      "username": "filemon12",
+      "password": "123"
+}

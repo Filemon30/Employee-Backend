@@ -4,6 +4,7 @@ import { nextIdFromMax } from "../utils/next-id";
 
 export type CreateDepartmentInput = {
   department_name: string;
+  department_head?: number | null;
 };
 
 export type UpdateDepartmentInput = Partial<CreateDepartmentInput>;
@@ -35,6 +36,7 @@ export class DepartmentModel {
       data: {
         department_id: departmentId,
         department_name: name,
+        department_head: data.department_head ?? null,
       },
       include: {
         positions: {
@@ -97,6 +99,10 @@ export class DepartmentModel {
       }
 
       updateData.department_name = name;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(data, "department_head")) {
+      updateData.department_head = data.department_head ?? null;
     }
 
     return prisma.departments.update({

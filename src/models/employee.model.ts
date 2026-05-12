@@ -3,7 +3,7 @@ import { nextIdFromMax } from "../utils/next-id";
 import type { Prisma } from "@prisma/client";
 
 export type CreateEmployeeInput = {
-  position_id: number;
+  position_id?: number | null;
   card_id?: number;
   acc_id: number;
   info_id: number;
@@ -35,7 +35,12 @@ export class EmployeeModel {
       data: baseData,
       include: {
         cards: true,
-        positions: true,
+        positions: {
+          include: {
+            departments: true,
+            salaries: true,
+          },
+        },
         user_accounts: true,
         user_informations: true,
         work_hours: true,
@@ -48,7 +53,12 @@ export class EmployeeModel {
     return prisma.employees.findMany({
       include: {
         cards: true,
-        positions: true,
+        positions: {
+          include: {
+            departments: true,
+            salaries: true,
+          },
+        },
         user_accounts: true,
         user_informations: true,
         work_hours: true,
@@ -63,7 +73,12 @@ export class EmployeeModel {
       where: { employee_id: employeeId },
       include: {
         cards: true,
-        positions: true,
+        positions: {
+          include: {
+            departments: true,
+            salaries: true,
+          },
+        },
         user_accounts: true,
         user_informations: true,
         work_hours: true,
@@ -78,7 +93,12 @@ export class EmployeeModel {
       data,
       include: {
         cards: true,
-        positions: true,
+        positions: {
+          include: {
+            departments: true,
+            salaries: true,
+          },
+        },
         user_accounts: true,
         user_informations: true,
         work_hours: true,

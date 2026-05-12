@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.workHourRouter = void 0;
+const express_1 = require("express");
+const work_hour_controller_1 = require("../controller/work-hour.controller");
+const workHourRouter = (0, express_1.Router)();
+exports.workHourRouter = workHourRouter;
+workHourRouter.post("/", work_hour_controller_1.createWorkHour);
+workHourRouter.get("/", work_hour_controller_1.getAllWorkHours);
+workHourRouter.get("/:id", work_hour_controller_1.getWorkHourById);
+workHourRouter.put("/:id", work_hour_controller_1.updateWorkHour);
+workHourRouter.delete("/:id", work_hour_controller_1.deleteWorkHour);

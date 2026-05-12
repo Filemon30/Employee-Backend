@@ -27,24 +27,27 @@ model cards {
 }
 
 model departments {
-  department_id   Int            @id
-  department_name String         @unique @db.VarChar(80)
-  positions       positions[]
-  transactions    transactions[]
+  department_id            Int            @id
+  department_name          String         @unique @db.VarChar(80)
+  department_head          Int?
+  positions                positions[]
+  transactions             transactions[]
+  department_head_employee employees?     @relation("DepartmentHead", fields: [department_head], references: [employee_id], onDelete: SetNull, onUpdate: NoAction)
 }
 
 model employees {
   employee_id                                        Int               @id
-  position_id                                        Int
+  position_id                                        Int?
   card_id                                            Int?              @unique
   acc_id                                             Int               @unique
   info_id                                            Int               @unique
   work_hour_id                                       Int
   attendances                                        attendances[]
+  departments_headed                                 departments[] @relation("DepartmentHead")
   user_accounts                                      user_accounts     @relation(fields: [acc_id], references: [acc_id], onDelete: Cascade, onUpdate: NoAction)
   cards                                              cards?            @relation(fields: [card_id], references: [card_id], onDelete: Cascade, onUpdate: NoAction)
   user_informations                                  user_informations @relation(fields: [info_id], references: [info_id], onDelete: Cascade, onUpdate: NoAction)
-  positions                                          positions         @relation(fields: [position_id], references: [position_id], onDelete: NoAction, onUpdate: NoAction)
+  positions                                          positions?        @relation(fields: [position_id], references: [position_id], onDelete: NoAction, onUpdate: NoAction)
   work_hours                                         work_hours        @relation(fields: [work_hour_id], references: [work_hour_id], onDelete: NoAction, onUpdate: NoAction)
   transactions_transactions_employee_idToemployees   transactions[]    @relation("transactions_employee_idToemployees")
   transactions_transactions_transacted_byToemployees transactions[]    @relation("transactions_transacted_byToemployees")

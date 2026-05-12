@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { WorkHourModel } from "../models/work-hour.model";
 import { AppError, asyncHandler } from "../utils/http";
+import { getTransactedById, logCrudTransaction } from "../utils/activity-log";
 
 const REQUIRED_WORK_MINUTES = 8 * 60;
 const LUNCH_START_MINUTE = 12 * 60;
@@ -129,6 +130,7 @@ const normalizeTimeRange = (timeIn: string, timeOut: string) => {
 };
 export const createWorkHour = asyncHandler(
 	async (req: Request, res: Response) => {
+		const transactedBy = getTransactedById(req);
 		const { time_in, time_out } = req.body as {
 			time_in?: string;
 			time_out?: string;
@@ -156,6 +158,13 @@ export const createWorkHour = asyncHandler(
 		const workHour = await WorkHourModel.create({
 			time_in: normalized.timeIn,
 			time_out: normalized.timeOut,
+		});
+
+		await logCrudTransaction({
+			action: "Create",
+			resource: "Work Hour",
+			transactedBy,
+			work_hour_id: workHour.work_hour_id,
 		});
 
 		res.status(201).json({
@@ -233,6 +242,13 @@ export const updateWorkHour = asyncHandler(
 			time_out: normalized.timeOut,
 		});
 
+		await logCrudTransaction({
+			action: "Update",
+			resource: "Work Hour",
+			transactedBy: getTransactedById(req),
+			work_hour_id: updatedWorkHour.work_hour_id,
+		});
+
 		res.status(200).json({
 			success: true,
 			message: "Work hour updated successfully.",
@@ -251,6 +267,13 @@ export const deleteWorkHour = asyncHandler(
 		}
 
 		await WorkHourModel.deleteById(id);
+
+		await logCrudTransaction({
+			action: "Delete",
+			resource: "Work Hour",
+			transactedBy: getTransactedById(req),
+			work_hour_id: id,
+		});
 
 		res.status(200).json({
 			success: true,

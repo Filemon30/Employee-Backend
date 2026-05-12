@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { SalaryModel } from "../models/salary.model";
 import { AppError, asyncHandler } from "../utils/http";
+import { getTransactedById, logCrudTransaction } from "../utils/activity-log";
 
 // SAFE ID PARSER
 const parseId = (rawId: unknown): number => {
@@ -17,6 +18,7 @@ const parseId = (rawId: unknown): number => {
 export const createSalary = asyncHandler(
   async (req: Request, res: Response) => {
     const { amount } = req.body;
+    const transactedBy = getTransactedById(req);
 
     if (!amount) {
       throw new AppError("Salary amount is required.", 400);
@@ -24,6 +26,13 @@ export const createSalary = asyncHandler(
 
     const salary = await SalaryModel.create({
       amount: String(amount),
+    });
+
+    await logCrudTransaction({
+      action: "Create",
+      resource: "Salary",
+      transactedBy,
+      salary_id: salary.salary_id,
     });
 
     res.status(201).json({
@@ -86,6 +95,13 @@ export const updateSalary = asyncHandler(
       amount: String(amount),
     });
 
+    await logCrudTransaction({
+      action: "Update",
+      resource: "Salary",
+      transactedBy: getTransactedById(req),
+      salary_id: salary.salary_id,
+    });
+
     res.status(200).json({
       success: true,
       message: "Salary updated successfully.",
@@ -106,6 +122,13 @@ export const deleteSalary = asyncHandler(
     }
 
     await SalaryModel.deleteById(id);
+
+    await logCrudTransaction({
+      action: "Delete",
+      resource: "Salary",
+      transactedBy: getTransactedById(req),
+      salary_id: id,
+    });
 
     res.status(200).json({
       success: true,

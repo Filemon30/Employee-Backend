@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { PositionModel } from "../models/position.model";
 import { SalaryModel } from "../models/salary.model";
 import { AppError, asyncHandler } from "../utils/http";
+import { getTransactedById, logCrudTransaction } from "../utils/activity-log";
 
 // SAFE ID PARSER
 const parseId = (rawId: unknown): number => {
@@ -18,6 +19,7 @@ const parseId = (rawId: unknown): number => {
 export const createPosition = asyncHandler(
   async (req: Request, res: Response) => {
     const { department_id, position_name, salary_type, salary_amount, salary_id } = req.body;
+    const transactedBy = getTransactedById(req);
 
     if (!department_id || !position_name || !salary_type) {
       throw new AppError(
@@ -74,6 +76,15 @@ export const createPosition = asyncHandler(
       department_id,
       position_name: position_name.trim(),
       salary_id: finalSalaryId,
+    });
+
+    await logCrudTransaction({
+      action: "Create",
+      resource: "Position",
+      transactedBy,
+      department_id: position.department_id,
+      position_id: position.position_id,
+      salary_id: position.salary_id,
     });
 
     res.status(201).json({
@@ -150,6 +161,15 @@ export const updatePosition = asyncHandler(
 
     const position = await PositionModel.updateById(id, updateData);
 
+    await logCrudTransaction({
+      action: "Update",
+      resource: "Position",
+      transactedBy: getTransactedById(req),
+      department_id: position.department_id,
+      position_id: position.position_id,
+      salary_id: position.salary_id,
+    });
+
     res.status(200).json({
       success: true,
       message: "Position updated successfully.",
@@ -170,6 +190,15 @@ export const deletePosition = asyncHandler(
     }
 
     await PositionModel.deleteById(id);
+
+    await logCrudTransaction({
+      action: "Delete",
+      resource: "Position",
+      transactedBy: getTransactedById(req),
+      department_id: existing.department_id,
+      position_id: existing.position_id,
+      salary_id: existing.salary_id,
+    });
 
     res.status(200).json({
       success: true,

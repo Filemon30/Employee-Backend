@@ -9,6 +9,7 @@ import { DepartmentModel } from "../models/department.model";
 import { PositionModel } from "../models/position.model";
 import { AppError, asyncHandler } from "../utils/http";
 import { Gender } from "../models/enums.model";
+import { getTransactedById, logCrudTransaction } from "../utils/activity-log";
 
 // SAFE ID PARSER
 const parseId = (rawId: unknown): number => {
@@ -28,6 +29,7 @@ const parseId = (rawId: unknown): number => {
 // Step 4: Account information
 export const createEmployee = asyncHandler(
   async (req: Request, res: Response) => {
+    const transactedBy = getTransactedById(req);
     const {
       // Step 1: Job Information
       department_id,
@@ -161,6 +163,16 @@ export const createEmployee = asyncHandler(
       work_hour_id,
     });
 
+    await logCrudTransaction({
+      action: "Create",
+      resource: "Employee",
+      transactedBy,
+      department_id: department.department_id,
+      position_id: employee.position_id ?? undefined,
+      work_hour_id: employee.work_hour_id,
+      employee_id: employee.employee_id,
+    });
+
     res.status(201).json({
       success: true,
       message: "Employee created successfully.",
@@ -219,6 +231,8 @@ export const updateEmployee = asyncHandler(
       throw new AppError("Employee not found.", 404);
     }
 
+    const transactedBy = getTransactedById(req);
+
     if (!update_type) {
       throw new AppError(
         "Please select what you want to update: Password, Position, or Card.",
@@ -254,6 +268,65 @@ export const updateEmployee = asyncHandler(
         }
 
         employeeData.position_id = position_id;
+
+        const positionName = position.position_name.trim().toLowerCase();
+        const isDepartmentHeadPosition =
+          positionName === "manager" || positionName.includes("head");
+
+        const currentHeadDepartments = await tx.departments.findMany({
+          where: { department_head: id },
+          select: {
+            department_id: true,
+          },
+        });
+
+        if (isDepartmentHeadPosition) {
+          const targetDepartment = await tx.departments.findUnique({
+            where: { department_id: position.department_id },
+            select: {
+              department_id: true,
+              department_head: true,
+            },
+          });
+
+          if (!targetDepartment) {
+            throw new AppError("Department not found.", 404);
+          }
+
+          if (
+            targetDepartment.department_head &&
+            targetDepartment.department_head !== id
+          ) {
+            await tx.employees.update({
+              where: { employee_id: targetDepartment.department_head },
+              data: { position_id: null },
+            });
+          }
+
+          for (const currentHeadDepartment of currentHeadDepartments) {
+            if (currentHeadDepartment.department_id === targetDepartment.department_id) {
+              continue;
+            }
+
+            await tx.departments.update({
+              where: { department_id: currentHeadDepartment.department_id },
+              data: { department_head: null },
+            });
+          }
+
+          await tx.departments.update({
+            where: { department_id: targetDepartment.department_id },
+            data: { department_head: id },
+          });
+        } else if (currentHeadDepartments.length > 0) {
+          for (const currentHeadDepartment of currentHeadDepartments) {
+            await tx.departments.update({
+              where: { department_id: currentHeadDepartment.department_id },
+              data: { department_head: null },
+            });
+          }
+        }
+
         handledUpdate = true;
       }
 
@@ -340,6 +413,16 @@ export const updateEmployee = asyncHandler(
 
     const employee = await EmployeeModel.findById(id);
 
+    await logCrudTransaction({
+      action: "Update",
+      resource: "Employee",
+      transactedBy,
+      department_id: employee?.positions?.department_id,
+      position_id: employee?.position_id ?? undefined,
+      work_hour_id: employee?.work_hour_id,
+      employee_id: id,
+    });
+
     res.status(200).json({
       success: true,
       message: "Employee updated successfully.",
@@ -360,6 +443,16 @@ export const deleteEmployee = asyncHandler(
     }
 
     await EmployeeModel.deleteById(id);
+
+    await logCrudTransaction({
+      action: "Delete",
+      resource: "Employee",
+      transactedBy: getTransactedById(req),
+      department_id: existing.positions?.department_id,
+      position_id: existing.position_id ?? undefined,
+      work_hour_id: existing.work_hour_id,
+      employee_id: id,
+    });
 
     res.status(200).json({
       success: true,
