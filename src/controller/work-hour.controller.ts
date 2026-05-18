@@ -1,9 +1,10 @@
 import { Request, Response } from "express";
+import { prisma } from "../config/db";
 import { WorkHourModel } from "../models/work-hour.model";
 import { AppError, asyncHandler } from "../utils/http";
 import { getTransactedById, logCrudTransaction } from "../utils/activity-log";
 
-const REQUIRED_WORK_MINUTES = 8 * 60;
+const REQUIRED_WORK_MINUTES = 4 * 60;
 const LUNCH_START_MINUTE = 12 * 60;
 const LUNCH_END_MINUTE = 13 * 60;
 
@@ -104,11 +105,16 @@ const getEffectiveWorkMinutes = (timeInMinutes: number, timeOutMinutes: number):
 const validateBusinessRule = (timeIn: string, timeOut: string): void => {
 	const timeInMinutes = parseTimeToMinutes(timeIn, "time_in");
 	const timeOutMinutes = parseTimeToMinutes(timeOut, "time_out");
+
+	if (timeOutMinutes <= timeInMinutes) {
+		throw new AppError("time_out must be later than time_in.", 400);
+	}
+
 	const effectiveMinutes = getEffectiveWorkMinutes(timeInMinutes, timeOutMinutes);
 
 	if (effectiveMinutes !== REQUIRED_WORK_MINUTES) {
 		throw new AppError(
-			"Work hours must total exactly 8 hours excluding the 12:00-1:00 PM lunch break.",
+			"Work hours must total exactly 4 hours after accounting for the automatic lunch overlap.",
 			400
 		);
 	}
@@ -128,12 +134,20 @@ const normalizeTimeRange = (timeIn: string, timeOut: string) => {
     timeOut: normalizedTimeOut,
   };
 };
+
+const deriveClassification = (timeIn: string): string => {
+	const timeInMinutes = parseTimeToMinutes(timeIn, "time_in");
+
+	return timeInMinutes < 12 * 60 ? "Morning" : "Afternoon";
+};
+
 export const createWorkHour = asyncHandler(
 	async (req: Request, res: Response) => {
 		const transactedBy = getTransactedById(req);
-		const { time_in, time_out } = req.body as {
+		const { time_in, time_out, lunch_break_minutes } = req.body as {
 			time_in?: string;
 			time_out?: string;
+			lunch_break_minutes?: number;
 		};
 
 		if (!time_in || !time_out) {
@@ -158,6 +172,8 @@ export const createWorkHour = asyncHandler(
 		const workHour = await WorkHourModel.create({
 			time_in: normalized.timeIn,
 			time_out: normalized.timeOut,
+			classification: deriveClassification(normalized.timeIn),
+			lunch_break_minutes,
 		});
 
 		await logCrudTransaction({
@@ -213,10 +229,11 @@ export const updateWorkHour = asyncHandler(
 			throw new AppError("Work hour not found.", 404);
 		}
 
-		const { time_in, time_out } = req.body as {
+		const { time_in, time_out, lunch_break_minutes } = req.body as {
 			time_in?: string;
 			time_out?: string;
-		};
+			lunch_break_minutes?: number;
+	};
 
 		const finalTimeIn = time_in ?? String(existing.time_in);
 		const finalTimeOut = time_out ?? String(existing.time_out);
@@ -240,6 +257,7 @@ export const updateWorkHour = asyncHandler(
 		const updatedWorkHour = await WorkHourModel.updateById(id, {
 			time_in: normalized.timeIn,
 			time_out: normalized.timeOut,
+			lunch_break_minutes,
 		});
 
 		await logCrudTransaction({
@@ -249,7 +267,7 @@ export const updateWorkHour = asyncHandler(
 			work_hour_id: updatedWorkHour.work_hour_id,
 		});
 
-		res.status(200).json({
+			res.status(200).json({
 			success: true,
 			message: "Work hour updated successfully.",
 			data: updatedWorkHour,
@@ -266,13 +284,39 @@ export const deleteWorkHour = asyncHandler(
 			throw new AppError("Work hour not found.", 404);
 		}
 
-		await WorkHourModel.deleteById(id);
-
 		await logCrudTransaction({
 			action: "Delete",
 			resource: "Work Hour",
 			transactedBy: getTransactedById(req),
 			work_hour_id: id,
+		});
+
+		await prisma.$transaction(async (tx) => {
+			await tx.employees.updateMany({
+				where: {
+					OR: [
+						{ morning_work_hour_id: id },
+						{ afternoon_work_hour_id: id },
+					],
+				},
+				data: {
+					morning_work_hour_id: null,
+					afternoon_work_hour_id: null,
+				},
+			});
+
+			await tx.transactions.updateMany({
+				where: {
+					work_hour_id: id,
+				},
+				data: {
+					work_hour_id: null,
+				},
+			});
+
+			await tx.work_hours.delete({
+				where: { work_hour_id: id },
+			});
 		});
 
 		res.status(200).json({

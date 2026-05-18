@@ -40,6 +40,13 @@ export class SalaryModel {
     });
   }
 
+  static findByAmount(amount: string) {
+    return prisma.salaries.findFirst({
+      where: { amount },
+      include: { positions: true },
+    });
+  }
+
   static updateById(salaryId: number, data: UpdateSalaryInput) {
     return prisma.salaries.update({
       where: { salary_id: salaryId },

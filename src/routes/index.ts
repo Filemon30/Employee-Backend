@@ -6,6 +6,7 @@ import { positionRouter } from "./position.routes";
 import { salaryRouter } from "./salary.routes";
 import { workHourRouter } from "./work-hour.routes";
 import { dashboardRouter } from "./dashboard.routes";
+import { transactionRouter } from "./transaction.routes";
 
 
 const apiRouter = Router();
@@ -24,5 +25,6 @@ apiRouter.use("/employees", employeeRouter);
 apiRouter.use("/positions", positionRouter);
 apiRouter.use("/salaries", salaryRouter);
 apiRouter.use("/work-hours", workHourRouter);
+apiRouter.use("/transactions", transactionRouter);
 
 export { apiRouter };

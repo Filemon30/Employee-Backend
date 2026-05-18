@@ -51,12 +51,17 @@ export class PositionModel {
     });
   }
 
-  static updateById(positionId: number, data: UpdatePositionInput) {
-    return prisma.positions.update({
+  static async updateById(positionId: number, data: UpdatePositionInput) {
+    console.log(`[PositionModel.updateById] Updating position ${positionId} with data:`, data);
+    
+    const result = await prisma.positions.update({
       where: { position_id: positionId },
       data,
       include: { departments: true, salaries: true, employees: true },
     });
+    
+    console.log(`[PositionModel.updateById] Position updated successfully:`, result);
+    return result;
   }
 
   static deleteById(positionId: number) {

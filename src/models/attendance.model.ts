@@ -1,13 +1,17 @@
 import { prisma } from "../config/db";
-import { AttendanceStatus } from "./enums.model";
 import { nextIdFromMax } from "../utils/next-id";
 
 export type CreateAttendanceInput = {
   employee_id: number;
   attendance_date: Date;
-  time_in?: Date;
-  time_out?: Date;
-  status: AttendanceStatus;
+  morning_time_in?: Date;
+  morning_in_status?: string;
+  morning_time_out?: Date;
+  morning_out_status?: string;
+  afternoon_time_in?: Date;
+  afternoon_in_status?: string;
+  afternoon_time_out?: Date;
+  afternoon_out_status?: string;
 };
 
 export type UpdateAttendanceInput = Partial<CreateAttendanceInput>;

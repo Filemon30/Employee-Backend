@@ -6,6 +6,8 @@ import { prisma } from "../config/db";
 import { AppError, asyncHandler } from "../utils/http";
 import { getTransactedById, logCrudTransaction } from "../utils/activity-log";
 
+const DEPARTMENT_HEAD_POSITION_NAME = "Department Head";
+
 // SAFE ID PARSER
 const parseId = (rawId: unknown): number => {
   const id = Number(Array.isArray(rawId) ? rawId[0] : rawId);
@@ -62,6 +64,65 @@ const ensureDepartmentHeadEmployeeMatchesDepartment = async (
   }
 };
 
+const resolveDepartmentHeadSalaryId = async (departmentId: number) => {
+  const existingDepartmentHeadPosition = await PositionModel.findByNameAndDepartment(
+    DEPARTMENT_HEAD_POSITION_NAME,
+    departmentId
+  );
+
+  if (existingDepartmentHeadPosition) {
+    return existingDepartmentHeadPosition.salary_id;
+  }
+
+  const firstDepartmentPosition = await prisma.positions.findFirst({
+    where: { department_id: departmentId },
+    orderBy: { position_id: "asc" },
+    select: { salary_id: true },
+  });
+
+  if (firstDepartmentPosition?.salary_id) {
+    return firstDepartmentPosition.salary_id;
+  }
+
+  const fallbackSalary = await prisma.salaries.findFirst({
+    orderBy: { salary_id: "asc" },
+    select: { salary_id: true },
+  });
+
+  if (!fallbackSalary?.salary_id) {
+    throw new AppError("No salary record available to create Department Head position.", 400);
+  }
+
+  return fallbackSalary.salary_id;
+};
+
+const ensureDepartmentHeadPosition = async (departmentId: number) => {
+  const existing = await PositionModel.findByNameAndDepartment(
+    DEPARTMENT_HEAD_POSITION_NAME,
+    departmentId
+  );
+
+  if (existing) {
+    return existing;
+  }
+
+  const salaryId = await resolveDepartmentHeadSalaryId(departmentId);
+
+  return PositionModel.create({
+    department_id: departmentId,
+    position_name: DEPARTMENT_HEAD_POSITION_NAME,
+    salary_id: salaryId,
+  });
+};
+
+const syncDepartmentHeadPositions = async (departments: Array<{ department_id: number }>) => {
+  await Promise.all(
+    departments.map(async (department) => {
+      await ensureDepartmentHeadPosition(department.department_id);
+    })
+  );
+};
+
 
 // CREATE
 export const createDepartment = asyncHandler(
@@ -85,6 +146,8 @@ export const createDepartment = asyncHandler(
       department_head: parsedDepartmentHead ?? null,
     });
 
+    await ensureDepartmentHeadPosition(department.department_id);
+
     await logCrudTransaction({
       action: "Create",
       resource: "Department",
@@ -104,10 +167,15 @@ export const createDepartment = asyncHandler(
 export const getAllDepartments = asyncHandler(
   async (req: Request, res: Response) => {
     const departments = await DepartmentModel.findAll();
+
+    await syncDepartmentHeadPositions(departments);
+
+    const refreshedDepartments = await DepartmentModel.findAll();
+
     res.status(200).json({
       success: true,
       message: "Departments retrieved successfully.",
-      data: departments,
+      data: refreshedDepartments,
     });
   }
 );
@@ -122,10 +190,14 @@ export const getDepartmentById = asyncHandler (
       throw new AppError("Department not found.", 404);
     }
 
+    await ensureDepartmentHeadPosition(id);
+
+    const refreshedDepartment = await DepartmentModel.findById(id);
+
     res.status(200).json({
       success: true,
       message: "Department retrieved successfully.",
-      data: department,
+      data: refreshedDepartment,
     });
   }
 );

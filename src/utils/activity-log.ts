@@ -2,7 +2,7 @@ import type { Request } from "express";
 import { AppError } from "./http";
 import { TransactionModel } from "../models/transaction.model";
 
-type CrudAction = "Create" | "Update" | "Delete";
+type CrudAction = "Create" | "Update" | "Delete" | "New";
 type CrudResource = "Department" | "Position" | "Salary" | "Work Hour" | "Employee";
 
 const parseRequiredId = (rawId: unknown, fieldName: string): number => {
@@ -30,15 +30,20 @@ type LogCrudTransactionInput = {
   employee_id?: number;
 };
 
-export const logCrudTransaction = (input: LogCrudTransactionInput) => {
-  return TransactionModel.create({
-    transaction_type: `${input.resource} ${input.action}`,
-    transacted_by: input.transactedBy,
-    reference_type: input.resource,
-    department_id: input.department_id,
-    position_id: input.position_id,
-    salary_id: input.salary_id,
-    work_hour_id: input.work_hour_id,
-    employee_id: input.employee_id,
-  });
+export const logCrudTransaction = async (input: LogCrudTransactionInput) => {
+  try {
+    return await TransactionModel.create({
+      transaction_type: `${input.resource} ${input.action}`,
+      transacted_by: input.transactedBy,
+      reference_type: input.resource,
+      department_id: input.department_id,
+      position_id: input.position_id,
+      salary_id: input.salary_id,
+      work_hour_id: input.work_hour_id,
+      employee_id: input.employee_id,
+    });
+  } catch (error) {
+    console.error("Failed to log transaction:", error);
+    return null;
+  }
 };

@@ -7,7 +7,8 @@ export type CreateEmployeeInput = {
   card_id?: number;
   acc_id: number;
   info_id: number;
-  work_hour_id: number;
+  morning_work_hour_id?: number | null;
+  afternoon_work_hour_id?: number | null;
 };
 
 export type UpdateEmployeeInput = Partial<CreateEmployeeInput>;
@@ -23,14 +24,14 @@ export class EmployeeModel {
     });
 
     const baseData = {
-      employee_id: employeeId,
-      position_id: data.position_id,
-      card_id: data.card_id ?? null,
-      acc_id: data.acc_id,
-      info_id: data.info_id,
-      work_hour_id: data.work_hour_id,
-    } as unknown as Prisma.employeesUncheckedCreateInput;
-
+        employee_id: employeeId,
+        position_id: data.position_id,
+        card_id: data.card_id ?? null,
+        acc_id: data.acc_id,
+        info_id: data.info_id,
+        morning_work_hour_id: data.morning_work_hour_id ?? null,
+        afternoon_work_hour_id: data.afternoon_work_hour_id ?? null,
+      } as unknown as Prisma.employeesUncheckedCreateInput;
     return prisma.employees.create({
       data: baseData,
       include: {
@@ -43,8 +44,9 @@ export class EmployeeModel {
         },
         user_accounts: true,
         user_informations: true,
-        work_hours: true,
         attendances: true,
+        morning_work_hour: true,
+        afternoon_work_hour: true,
       },
     });
   }
@@ -61,8 +63,9 @@ export class EmployeeModel {
         },
         user_accounts: true,
         user_informations: true,
-        work_hours: true,
         attendances: true,
+        morning_work_hour: true,
+        afternoon_work_hour: true,
       },
       orderBy: { employee_id: "asc" },
     });
@@ -81,8 +84,9 @@ export class EmployeeModel {
         },
         user_accounts: true,
         user_informations: true,
-        work_hours: true,
         attendances: true,
+        morning_work_hour: true,
+        afternoon_work_hour: true,
       },
     });
   }
@@ -101,8 +105,9 @@ export class EmployeeModel {
         },
         user_accounts: true,
         user_informations: true,
-        work_hours: true,
         attendances: true,
+        morning_work_hour: true,
+        afternoon_work_hour: true,
       },
     });
   }

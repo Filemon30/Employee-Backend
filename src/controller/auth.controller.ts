@@ -25,6 +25,7 @@ const isAllowedLoginDepartmentAndPosition = (
     "department head",
     "chief human resources officer",
     "hr generalist",
+    "admin",
   ];
 
   const isAllowedPosition = allowedPositions.includes(posNorm);

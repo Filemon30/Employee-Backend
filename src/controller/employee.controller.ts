@@ -10,6 +10,12 @@ import { PositionModel } from "../models/position.model";
 import { AppError, asyncHandler } from "../utils/http";
 import { Gender } from "../models/enums.model";
 import { getTransactedById, logCrudTransaction } from "../utils/activity-log";
+import { nextIdFromMax } from "../utils/next-id";
+
+const isDepartmentHeadPosition = (positionName: string) => {
+  const normalized = positionName.trim().toLowerCase();
+  return normalized === "manager" || normalized.includes("head");
+};
 
 // SAFE ID PARSER
 const parseId = (rawId: unknown): number => {
@@ -24,7 +30,7 @@ const parseId = (rawId: unknown): number => {
 
 // CREATE EMPLOYEE WITH COMPLETE FLOW
 // Step 1: Department & Position selection
-// Step 2: Work hours (select existing work_hour_id)
+// Step 2: Work hours (select existing morning_work_hour_id and/or afternoon_work_hour_id)
 // Step 3: Personal information, address, contact number
 // Step 4: Account information
 export const createEmployee = asyncHandler(
@@ -35,7 +41,8 @@ export const createEmployee = asyncHandler(
       department_id,
       position_id,
       // Step 2: Work Hours
-      work_hour_id,
+      morning_work_hour_id,
+      afternoon_work_hour_id,
       // Step 3: Personal Information
       first_name,
       middle_name,
@@ -82,14 +89,40 @@ export const createEmployee = asyncHandler(
       );
     }
 
-    // Step 2: Validate Work Hour ID
-    if (!work_hour_id) {
-      throw new AppError("Work hour ID is required.", 400);
+    // Step 2: Validate Work Hour IDs
+    if (!morning_work_hour_id && !afternoon_work_hour_id) {
+      throw new AppError(
+        "At least one work hour ID is required (morning or afternoon).",
+        400
+      );
     }
 
-    const workHour = await WorkHourModel.findById(work_hour_id);
-    if (!workHour) {
-      throw new AppError("Work hour not found.", 404);
+    let morningWorkHour = null;
+    let afternoonWorkHour = null;
+
+    if (morning_work_hour_id) {
+      morningWorkHour = await WorkHourModel.findById(morning_work_hour_id);
+      if (!morningWorkHour) {
+        throw new AppError("Morning work hour not found.", 404);
+      }
+    }
+
+    if (afternoon_work_hour_id) {
+      afternoonWorkHour = await WorkHourModel.findById(afternoon_work_hour_id);
+      if (!afternoonWorkHour) {
+        throw new AppError("Afternoon work hour not found.", 404);
+      }
+    }
+
+    if (
+      morning_work_hour_id &&
+      afternoon_work_hour_id &&
+      morning_work_hour_id === afternoon_work_hour_id
+    ) {
+      throw new AppError(
+        "Morning and afternoon work hour IDs must be different.",
+        400
+      );
     }
 
     // Step 3: Validate Personal Information
@@ -134,42 +167,108 @@ export const createEmployee = asyncHandler(
     }
 
     // ========== CREATE RECORDS ==========
-    // Step 3: Create User Information
-    const userInformation = await UserInformationModel.create({
-      first_name,
-      middle_name: middle_name || undefined,
-      last_name,
-      suffix: suffix || undefined,
-      gender,
-      birthdate: new Date(birthdate),
-      province,
-      city,
-      barangay,
-      zip_code,
-      contact_number,
-    });
+    const willUpdateDepartmentHead = isDepartmentHeadPosition(position.position_name);
 
-    // Step 4: Create User Account
-    const userAccount = await UserAccountModel.create({
-      username,
-      password,
-    });
+    const employee = await prisma.$transaction(async (tx) => {
+      const infoId = await nextIdFromMax(async () => {
+        const result = await tx.user_informations.aggregate({
+          _max: { info_id: true },
+        });
+        return result._max.info_id;
+      });
 
-    // Step 1: Create Employee (without card_id as it will be updated later)
-    const employee = await EmployeeModel.create({
-      position_id,
-      info_id: userInformation.info_id,
-      acc_id: userAccount.acc_id,
-      work_hour_id,
+      const accId = await nextIdFromMax(async () => {
+        const result = await tx.user_accounts.aggregate({
+          _max: { acc_id: true },
+        });
+        return result._max.acc_id;
+      });
+
+      const userInformation = await tx.user_informations.create({
+        data: {
+          info_id: infoId,
+          first_name,
+          middle_name: middle_name || undefined,
+          last_name,
+          suffix: suffix || undefined,
+          gender,
+          birthdate: new Date(birthdate),
+          province,
+          city,
+          barangay,
+          zip_code,
+          contact_number,
+        },
+      });
+
+      const userAccount = await tx.user_accounts.create({
+        data: {
+          acc_id: accId,
+          username,
+          password,
+        },
+      });
+
+      const employeeId = await nextIdFromMax(async () => {
+        const result = await tx.employees.aggregate({
+          _max: { employee_id: true },
+        });
+        return result._max.employee_id;
+      });
+
+      const createdEmployee = await tx.employees.create({
+        data: {
+          employee_id: employeeId,
+          position_id,
+          acc_id: userAccount.acc_id,
+          info_id: userInformation.info_id,
+          morning_work_hour_id: morning_work_hour_id ?? null,
+          afternoon_work_hour_id: afternoon_work_hour_id ?? null,
+        },
+        include: {
+          cards: true,
+          positions: {
+            include: {
+              departments: true,
+              salaries: true,
+            },
+          },
+          user_accounts: true,
+          user_informations: true,
+          attendances: true,
+          morning_work_hour: true,
+          afternoon_work_hour: true,
+        },
+      });
+
+      if (willUpdateDepartmentHead) {
+        if (
+          department.department_head &&
+          department.department_head !== createdEmployee.employee_id
+        ) {
+          await tx.employees.update({
+            where: { employee_id: department.department_head },
+            data: { position_id: null },
+          });
+        }
+
+        await tx.departments.update({
+          where: { department_id: department.department_id },
+          data: { department_head: createdEmployee.employee_id },
+        });
+      }
+
+      return createdEmployee;
     });
 
     await logCrudTransaction({
-      action: "Create",
+      action: "New",
       resource: "Employee",
       transactedBy,
       department_id: department.department_id,
       position_id: employee.position_id ?? undefined,
-      work_hour_id: employee.work_hour_id,
+      work_hour_id:
+        employee.morning_work_hour_id ?? employee.afternoon_work_hour_id ?? undefined,
       employee_id: employee.employee_id,
     });
 
@@ -223,6 +322,8 @@ export const updateEmployee = asyncHandler(
       position_id,
       card_number,
       password,
+      morning_work_hour_id,
+      afternoon_work_hour_id,
     } = req.body;
 
     const existing = await EmployeeModel.findById(id);
@@ -235,7 +336,7 @@ export const updateEmployee = asyncHandler(
 
     if (!update_type) {
       throw new AppError(
-        "Please select what you want to update: Password, Position, or Card.",
+        "Please select what you want to update: Password, Position, Card, or Shift.",
         400
       );
     }
@@ -398,6 +499,37 @@ export const updateEmployee = asyncHandler(
         handledUpdate = true;
       }
 
+      if (update_type === "Shift") {
+        if (morning_work_hour_id === undefined || afternoon_work_hour_id === undefined) {
+          throw new AppError("Both morning and afternoon work hour IDs are required.", 400);
+        }
+
+        // Check if employee already has these work hours assigned
+        if (existing.morning_work_hour_id === morning_work_hour_id && existing.afternoon_work_hour_id === afternoon_work_hour_id) {
+          throw new AppError("Employee already has these shift times assigned.", 400);
+        }
+
+        const morningWorkHour = await tx.work_hours.findUnique({
+          where: { work_hour_id: morning_work_hour_id },
+        });
+
+        const afternoonWorkHour = await tx.work_hours.findUnique({
+          where: { work_hour_id: afternoon_work_hour_id },
+        });
+
+        if (!morningWorkHour) {
+          throw new AppError("Morning work hour not found.", 404);
+        }
+
+        if (!afternoonWorkHour) {
+          throw new AppError("Afternoon work hour not found.", 404);
+        }
+
+        employeeData.morning_work_hour_id = morning_work_hour_id;
+        employeeData.afternoon_work_hour_id = afternoon_work_hour_id;
+        handledUpdate = true;
+      }
+
       if (!handledUpdate) {
         throw new AppError(
           "Invalid update type. Use Password, Position, or Card.",
@@ -419,7 +551,8 @@ export const updateEmployee = asyncHandler(
       transactedBy,
       department_id: employee?.positions?.department_id,
       position_id: employee?.position_id ?? undefined,
-      work_hour_id: employee?.work_hour_id,
+      work_hour_id:
+        employee?.morning_work_hour_id ?? employee?.afternoon_work_hour_id ?? undefined,
       employee_id: id,
     });
 
@@ -442,7 +575,38 @@ export const deleteEmployee = asyncHandler(
       throw new AppError("Employee not found.", 404);
     }
 
-    await EmployeeModel.deleteById(id);
+    await prisma.$transaction(async (tx) => {
+      await tx.transactions.deleteMany({
+        where: {
+          OR: [
+            { employee_id: id },
+            { transacted_by: id },
+          ],
+        },
+      });
+
+      await tx.employees.delete({
+        where: { employee_id: id },
+      });
+
+      if (existing.card_id) {
+        await tx.cards.delete({
+          where: { card_id: existing.card_id },
+        });
+      }
+
+      if (existing.acc_id) {
+        await tx.user_accounts.delete({
+          where: { acc_id: existing.acc_id },
+        });
+      }
+
+      if (existing.info_id) {
+        await tx.user_informations.delete({
+          where: { info_id: existing.info_id },
+        });
+      }
+    });
 
     await logCrudTransaction({
       action: "Delete",
@@ -450,7 +614,8 @@ export const deleteEmployee = asyncHandler(
       transactedBy: getTransactedById(req),
       department_id: existing.positions?.department_id,
       position_id: existing.position_id ?? undefined,
-      work_hour_id: existing.work_hour_id,
+      work_hour_id:
+        existing.morning_work_hour_id ?? existing.afternoon_work_hour_id ?? undefined,
       employee_id: id,
     });
 

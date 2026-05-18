@@ -17,25 +17,33 @@ export const dashboardController = {
     // Count total departments
     const totalDepartments = await prisma.departments.count();
 
-    // Count present attendances for today
+    // Count present attendances for today (has at least one check-in)
     const totalPresent = await prisma.attendances.count({
       where: {
         attendance_date: {
           gte: today,
           lt: tomorrow,
         },
-        status: "Present",
+        OR: [
+          { morning_time_in: { not: null } },
+          { morning_time_out: { not: null } },
+          { afternoon_time_in: { not: null } },
+          { afternoon_time_out: { not: null } },
+        ],
       },
     });
 
-    // Count absent attendances for today
+    // Count absent attendances for today (no check-ins at all)
     const totalAbsent = await prisma.attendances.count({
       where: {
         attendance_date: {
           gte: today,
           lt: tomorrow,
         },
-        status: "Absent",
+        morning_time_in: null,
+        morning_time_out: null,
+        afternoon_time_in: null,
+        afternoon_time_out: null,
       },
     });
 
@@ -84,14 +92,24 @@ export const dashboardController = {
       const userInfo = attendance.employees.user_informations;
       const fullName = `${userInfo?.last_name || ""}, ${userInfo?.first_name || ""} ${userInfo?.suffix || ""}`.trim();
       
+      // Get the first time entry available
+      const firstTimeEntry = attendance.morning_time_in || attendance.morning_time_out || attendance.afternoon_time_in || attendance.afternoon_time_out;
+      const timeIn = firstTimeEntry?.toLocaleTimeString("en-US", { 
+        hour: "2-digit", 
+        minute: "2-digit",
+        hour12: true 
+      }) || "N/A";
+
+      // Determine status based on which times are filled
+      let status = "Absent";
+      if (firstTimeEntry) {
+        status = "Present";
+      }
+      
       return {
         fullName,
-        status: attendance.status,
-        timeIn: attendance.time_in?.toLocaleTimeString("en-US", { 
-          hour: "2-digit", 
-          minute: "2-digit",
-          hour12: true 
-        }) || "N/A",
+        status,
+        timeIn,
       };
     });
 
@@ -104,6 +122,13 @@ export const dashboardController = {
   getRecentTransactions: asyncHandler(async (_req: Request, res: Response) => {
     // Fetch recent transactions
     const transactions = await prisma.transactions.findMany({
+      include: {
+        employees_transactions_transacted_byToemployees: {
+          include: {
+            user_informations: true,
+          },
+        },
+      },
       orderBy: {
         transaction_date: "desc",
       },
@@ -122,10 +147,13 @@ export const dashboardController = {
         hour12: true,
       }) || "N/A";
 
+      const transactedBy = transaction.employees_transactions_transacted_byToemployees;
+      const firstName = transactedBy?.user_informations?.first_name || "Unknown";
+
       return {
         reference: `${transaction.transaction_id}`.padStart(6, "0"),
         type: transaction.transaction_type,
-        by: "HR",
+        firstName,
         dateTime,
       };
     });

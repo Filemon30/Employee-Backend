@@ -35,8 +35,16 @@ export class TransactionModel {
         position: true,
         salary: true,
         work_hour: true,
-        employees_transactions_employee_idToemployees: true,
-        employees_transactions_transacted_byToemployees: true,
+        employees_transactions_employee_idToemployees: {
+          include: {
+            user_informations: true,
+          },
+        },
+        employees_transactions_transacted_byToemployees: {
+          include: {
+            user_informations: true,
+          },
+        },
       },
     });
   }
@@ -48,8 +56,16 @@ export class TransactionModel {
         position: true,
         salary: true,
         work_hour: true,
-        employees_transactions_employee_idToemployees: true,
-        employees_transactions_transacted_byToemployees: true,
+        employees_transactions_employee_idToemployees: {
+          include: {
+            user_informations: true,
+          },
+        },
+        employees_transactions_transacted_byToemployees: {
+          include: {
+            user_informations: true,
+          },
+        },
       },
       orderBy: { transaction_id: "desc" },
     });
@@ -63,8 +79,16 @@ export class TransactionModel {
         position: true,
         salary: true,
         work_hour: true,
-        employees_transactions_employee_idToemployees: true,
-        employees_transactions_transacted_byToemployees: true,
+        employees_transactions_employee_idToemployees: {
+          include: {
+            user_informations: true,
+          },
+        },
+        employees_transactions_transacted_byToemployees: {
+          include: {
+            user_informations: true,
+          },
+        },
       },
     });
   }
@@ -78,8 +102,16 @@ export class TransactionModel {
         position: true,
         salary: true,
         work_hour: true,
-        employees_transactions_employee_idToemployees: true,
-        employees_transactions_transacted_byToemployees: true,
+        employees_transactions_employee_idToemployees: {
+          include: {
+            user_informations: true,
+          },
+        },
+        employees_transactions_transacted_byToemployees: {
+          include: {
+            user_informations: true,
+          },
+        },
       },
     });
   }

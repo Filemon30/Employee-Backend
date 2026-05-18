@@ -62,6 +62,7 @@ CREATE TABLE work_hours(
     work_hour_id INT PRIMARY KEY,
     time_in VARCHAR(20) NOT NULL,
     time_out VARCHAR(20) NOT NULL,
+    classification VARCHAR(20), /* Morning, Afternoon, Night */
     CHECK (time_out > time_in)
 );
 
@@ -96,9 +97,14 @@ CREATE TABLE attendances(
     attendance_id INT PRIMARY KEY,
     employee_id INT NOT NULL,
     attendance_date DATE NOT NULL DEFAULT CURRENT_DATE,
-    time_in TIME,
-    time_out TIME,
-    status attendance_status_enum NOT NULL,
+    morning_time_in TIME,
+    morning_in_status VARCHAR(50),
+    morning_time_out TIME,
+    morning_out_status VARCHAR(50),
+    afternoon_time_in TIME,
+    afternoon_in_status VARCHAR(50),
+    afternoon_time_out TIME,
+    afternoon_out_status VARCHAR(50),
 
     FOREIGN KEY (employee_id)
         REFERENCES employees(employee_id)
@@ -146,23 +152,3 @@ CREATE TABLE transactions(
 
 CREATE INDEX idx_transaction_date
 ON transactions(transaction_date);
-
-
-{
-      "department_id": 1,
-      "position_id": 2,
-      "work_hour_id": 1,
-      "first_name": "Filemon",
-      "middle_name": "Galanida",
-      "last_name": "Leornas",
-      "suffix": "Jr.",
-      "gender": "Male",
-      "birthdate": "12/30/2001",
-      "province": "Bukidnon",
-      "city": "Malaybalay City",
-      "barangay": "Brgy 1",
-      "zip_code": "8700",
-      "contact_number": "12345678901",
-      "username": "filemon12",
-      "password": "123"
-}

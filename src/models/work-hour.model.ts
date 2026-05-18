@@ -4,6 +4,8 @@ import { nextIdFromMax } from "../utils/next-id";
 export type CreateWorkHourInput = {
   time_in: string;
   time_out: string;
+  classification?: string;
+  lunch_break_minutes?: number;
 };
 
 export type UpdateWorkHourInput = Partial<CreateWorkHourInput>;
@@ -23,13 +25,13 @@ export class WorkHourModel {
         work_hour_id: workHourId,
         ...data,
       },
-      include: { employees: true },
+      include: { morning_employees: true, afternoon_employees: true },
     });
   }
 
   static findAll() {
     return prisma.work_hours.findMany({
-      include: { employees: true },
+      include: { morning_employees: true, afternoon_employees: true },
       orderBy: { work_hour_id: "asc" },
     });
   }
@@ -37,7 +39,7 @@ export class WorkHourModel {
   static findById(workHourId: number) {
     return prisma.work_hours.findUnique({
       where: { work_hour_id: workHourId },
-      include: { employees: true },
+      include: { morning_employees: true, afternoon_employees: true },
     });
   }
 
@@ -47,7 +49,7 @@ export class WorkHourModel {
         time_in: timeIn,
         time_out: timeOut,
       },
-      include: { employees: true },
+      include: { morning_employees: true, afternoon_employees: true },
     });
   }
 
@@ -64,7 +66,7 @@ export class WorkHourModel {
           not: workHourId,
         },
       },
-      include: { employees: true },
+      include: { morning_employees: true, afternoon_employees: true },
     });
   }
 
@@ -72,7 +74,7 @@ export class WorkHourModel {
     return prisma.work_hours.update({
       where: { work_hour_id: workHourId },
       data,
-      include: { employees: true },
+      include: { morning_employees: true, afternoon_employees: true },
     });
   }
 

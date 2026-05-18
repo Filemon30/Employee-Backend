@@ -24,8 +24,20 @@ export const createSalary = asyncHandler(
       throw new AppError("Salary amount is required.", 400);
     }
 
+    const normalizedAmount = String(amount).trim().replace(/,/g, '');
+
+    if (!normalizedAmount) {
+      throw new AppError("Salary amount is required.", 400);
+    }
+
+    const existingSalary = await SalaryModel.findByAmount(normalizedAmount);
+
+    if (existingSalary) {
+      throw new AppError("Salary amount already exists.", 409);
+    }
+
     const salary = await SalaryModel.create({
-      amount: String(amount),
+      amount: normalizedAmount,
     });
 
     await logCrudTransaction({
@@ -91,8 +103,20 @@ export const updateSalary = asyncHandler(
       throw new AppError("Salary amount is required.", 400);
     }
 
+    const normalizedAmount = String(amount).trim().replace(/,/g, '');
+
+    if (!normalizedAmount) {
+      throw new AppError("Salary amount is required.", 400);
+    }
+
+    const duplicateSalary = await SalaryModel.findByAmount(normalizedAmount);
+
+    if (duplicateSalary && duplicateSalary.salary_id !== id) {
+      throw new AppError("Salary amount already exists.", 409);
+    }
+
     const salary = await SalaryModel.updateById(id, {
-      amount: String(amount),
+      amount: normalizedAmount,
     });
 
     await logCrudTransaction({

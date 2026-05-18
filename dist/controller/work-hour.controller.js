@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteWorkHour = exports.updateWorkHour = exports.getWorkHourById = exports.getAllWorkHours = exports.createWorkHour = void 0;
 const work_hour_model_1 = require("../models/work-hour.model");
 const http_1 = require("../utils/http");
-const REQUIRED_WORK_MINUTES = 8 * 60;
+const REQUIRED_WORK_MINUTES = 4 * 60;
 const LUNCH_START_MINUTE = 12 * 60;
 const LUNCH_END_MINUTE = 13 * 60;
 const parseId = (rawId) => {
@@ -76,7 +76,7 @@ const validateBusinessRule = (timeIn, timeOut) => {
     const timeOutMinutes = parseTimeToMinutes(timeOut, "time_out");
     const effectiveMinutes = getEffectiveWorkMinutes(timeInMinutes, timeOutMinutes);
     if (effectiveMinutes !== REQUIRED_WORK_MINUTES) {
-        throw new http_1.AppError("Work hours must total exactly 8 hours excluding the 12:00-1:00 PM lunch break.", 400);
+        throw new http_1.AppError("Work hours must total exactly 4 hours after accounting for the automatic lunch overlap.", 400);
     }
 };
 const normalizeTimeRange = (timeIn, timeOut) => {

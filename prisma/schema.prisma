@@ -8,13 +8,18 @@ datasource db {
 }
 
 model attendances {
-  attendance_id   Int                    @id
-  employee_id     Int
-  attendance_date DateTime               @default(dbgenerated("CURRENT_DATE")) @db.Date
-  time_in         DateTime?              @db.Time(6)
-  time_out        DateTime?              @db.Time(6)
-  status          attendance_status_enum
-  employees       employees              @relation(fields: [employee_id], references: [employee_id], onDelete: Cascade, onUpdate: NoAction)
+  attendance_id        Int       @id
+  employee_id          Int
+  attendance_date      DateTime  @default(dbgenerated("CURRENT_DATE")) @db.Date
+  afternoon_in_status  String?   @db.VarChar(50)
+  afternoon_out_status String?   @db.VarChar(50)
+  afternoon_time_in    DateTime? @db.Time(6)
+  afternoon_time_out   DateTime? @db.Time(6)
+  morning_in_status    String?   @db.VarChar(50)
+  morning_out_status   String?   @db.VarChar(50)
+  morning_time_in      DateTime? @db.Time(6)
+  morning_time_out     DateTime? @db.Time(6)
+  employees            employees @relation(fields: [employee_id], references: [employee_id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([employee_id, attendance_date])
   @@index([employee_id, attendance_date], map: "idx_attendance_employee_date")
@@ -30,9 +35,9 @@ model departments {
   department_id            Int            @id
   department_name          String         @unique @db.VarChar(80)
   department_head          Int?
+  department_head_employee employees?     @relation("DepartmentHead", fields: [department_head], references: [employee_id], onUpdate: NoAction)
   positions                positions[]
   transactions             transactions[]
-  department_head_employee employees?     @relation("DepartmentHead", fields: [department_head], references: [employee_id], onDelete: SetNull, onUpdate: NoAction)
 }
 
 model employees {
@@ -41,14 +46,16 @@ model employees {
   card_id                                            Int?              @unique
   acc_id                                             Int               @unique
   info_id                                            Int               @unique
-  work_hour_id                                       Int
+  morning_work_hour_id                               Int?
+  afternoon_work_hour_id                             Int?
   attendances                                        attendances[]
-  departments_headed                                 departments[] @relation("DepartmentHead")
+  departments_headed                                 departments[]     @relation("DepartmentHead")
   user_accounts                                      user_accounts     @relation(fields: [acc_id], references: [acc_id], onDelete: Cascade, onUpdate: NoAction)
   cards                                              cards?            @relation(fields: [card_id], references: [card_id], onDelete: Cascade, onUpdate: NoAction)
   user_informations                                  user_informations @relation(fields: [info_id], references: [info_id], onDelete: Cascade, onUpdate: NoAction)
   positions                                          positions?        @relation(fields: [position_id], references: [position_id], onDelete: NoAction, onUpdate: NoAction)
-  work_hours                                         work_hours        @relation(fields: [work_hour_id], references: [work_hour_id], onDelete: NoAction, onUpdate: NoAction)
+  morning_work_hour                                  work_hours?       @relation("MorningWorkHour", fields: [morning_work_hour_id], references: [work_hour_id], onDelete: NoAction, onUpdate: NoAction)
+  afternoon_work_hour                                work_hours?       @relation("AfternoonWorkHour", fields: [afternoon_work_hour_id], references: [work_hour_id], onDelete: NoAction, onUpdate: NoAction)
   transactions_transactions_employee_idToemployees   transactions[]    @relation("transactions_employee_idToemployees")
   transactions_transactions_transacted_byToemployees transactions[]    @relation("transactions_transacted_byToemployees")
 }
@@ -107,7 +114,6 @@ model user_informations {
   first_name     String      @db.VarChar(50)
   middle_name    String?     @db.VarChar(50)
   last_name      String      @db.VarChar(50)
-  suffix         String?     @db.VarChar(20)
   gender         gender_enum
   birthdate      DateTime    @db.Date
   province       String      @db.VarChar(200)
@@ -115,16 +121,20 @@ model user_informations {
   barangay       String      @db.VarChar(200)
   zip_code       String      @db.VarChar(20)
   contact_number String      @db.VarChar(20)
+  suffix         String?     @db.VarChar(20)
   employees      employees?
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model work_hours {
-  work_hour_id Int            @id
-  time_in      String         @db.VarChar(20)
-  time_out     String         @db.VarChar(20)
-  employees    employees[]
-  transactions transactions[]
+  work_hour_id         Int            @id
+  time_in              String         @db.VarChar(20)
+  time_out             String         @db.VarChar(20)
+  classification       String?        @db.VarChar(20)
+  lunch_break_minutes  Int?
+  morning_employees    employees[]     @relation("MorningWorkHour")
+  afternoon_employees  employees[]     @relation("AfternoonWorkHour")
+  transactions         transactions[]
 }
 
 enum attendance_status_enum {
