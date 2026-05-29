@@ -1,8 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteWorkHour = exports.updateWorkHour = exports.getWorkHourById = exports.getAllWorkHours = exports.createWorkHour = void 0;
+const db_1 = require("../config/db");
 const work_hour_model_1 = require("../models/work-hour.model");
 const http_1 = require("../utils/http");
+const activity_log_1 = require("../utils/activity-log");
 const REQUIRED_WORK_MINUTES = 4 * 60;
 const LUNCH_START_MINUTE = 12 * 60;
 const LUNCH_END_MINUTE = 13 * 60;
@@ -74,6 +76,9 @@ const getEffectiveWorkMinutes = (timeInMinutes, timeOutMinutes) => {
 const validateBusinessRule = (timeIn, timeOut) => {
     const timeInMinutes = parseTimeToMinutes(timeIn, "time_in");
     const timeOutMinutes = parseTimeToMinutes(timeOut, "time_out");
+    if (timeOutMinutes <= timeInMinutes) {
+        throw new http_1.AppError("time_out must be later than time_in.", 400);
+    }
     const effectiveMinutes = getEffectiveWorkMinutes(timeInMinutes, timeOutMinutes);
     if (effectiveMinutes !== REQUIRED_WORK_MINUTES) {
         throw new http_1.AppError("Work hours must total exactly 4 hours after accounting for the automatic lunch overlap.", 400);
@@ -87,8 +92,13 @@ const normalizeTimeRange = (timeIn, timeOut) => {
         timeOut: normalizedTimeOut,
     };
 };
+const deriveClassification = (timeIn) => {
+    const timeInMinutes = parseTimeToMinutes(timeIn, "time_in");
+    return timeInMinutes < 12 * 60 ? "Morning" : "Afternoon";
+};
 exports.createWorkHour = (0, http_1.asyncHandler)(async (req, res) => {
-    const { time_in, time_out } = req.body;
+    const transactedBy = (0, activity_log_1.getTransactedById)(req);
+    const { time_in, time_out, lunch_break_minutes } = req.body;
     if (!time_in || !time_out) {
         throw new http_1.AppError("time_in and time_out are required.", 400);
     }
@@ -101,6 +111,14 @@ exports.createWorkHour = (0, http_1.asyncHandler)(async (req, res) => {
     const workHour = await work_hour_model_1.WorkHourModel.create({
         time_in: normalized.timeIn,
         time_out: normalized.timeOut,
+        classification: deriveClassification(normalized.timeIn),
+        lunch_break_minutes,
+    });
+    await (0, activity_log_1.logCrudTransaction)({
+        action: "Create",
+        resource: "Work Hour",
+        transactedBy,
+        work_hour_id: workHour.work_hour_id,
     });
     res.status(201).json({
         success: true,
@@ -134,7 +152,7 @@ exports.updateWorkHour = (0, http_1.asyncHandler)(async (req, res) => {
     if (!existing) {
         throw new http_1.AppError("Work hour not found.", 404);
     }
-    const { time_in, time_out } = req.body;
+    const { time_in, time_out, lunch_break_minutes } = req.body;
     const finalTimeIn = time_in ?? String(existing.time_in);
     const finalTimeOut = time_out ?? String(existing.time_out);
     validateBusinessRule(finalTimeIn, finalTimeOut);
@@ -146,6 +164,13 @@ exports.updateWorkHour = (0, http_1.asyncHandler)(async (req, res) => {
     const updatedWorkHour = await work_hour_model_1.WorkHourModel.updateById(id, {
         time_in: normalized.timeIn,
         time_out: normalized.timeOut,
+        lunch_break_minutes,
+    });
+    await (0, activity_log_1.logCrudTransaction)({
+        action: "Update",
+        resource: "Work Hour",
+        transactedBy: (0, activity_log_1.getTransactedById)(req),
+        work_hour_id: updatedWorkHour.work_hour_id,
     });
     res.status(200).json({
         success: true,
@@ -159,7 +184,29 @@ exports.deleteWorkHour = (0, http_1.asyncHandler)(async (req, res) => {
     if (!existing) {
         throw new http_1.AppError("Work hour not found.", 404);
     }
-    await work_hour_model_1.WorkHourModel.deleteById(id);
+    await (0, activity_log_1.logCrudTransaction)({
+        action: "Delete",
+        resource: "Work Hour",
+        transactedBy: (0, activity_log_1.getTransactedById)(req),
+        work_hour_id: id,
+    });
+    await db_1.prisma.$transaction(async (tx) => {
+        await tx.employees.updateMany({
+            where: {
+                OR: [
+                    { morning_work_hour_id: id },
+                    { afternoon_work_hour_id: id },
+                ],
+            },
+            data: {
+                morning_work_hour_id: null,
+                afternoon_work_hour_id: null,
+            },
+        });
+        await tx.work_hours.delete({
+            where: { work_hour_id: id },
+        });
+    });
     res.status(200).json({
         success: true,
         message: "Work hour deleted successfully.",

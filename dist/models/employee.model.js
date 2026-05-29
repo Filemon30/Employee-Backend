@@ -17,17 +17,24 @@ class EmployeeModel {
             card_id: data.card_id ?? null,
             acc_id: data.acc_id,
             info_id: data.info_id,
-            work_hour_id: data.work_hour_id,
+            morning_work_hour_id: data.morning_work_hour_id ?? null,
+            afternoon_work_hour_id: data.afternoon_work_hour_id ?? null,
         };
         return db_1.prisma.employees.create({
             data: baseData,
             include: {
                 cards: true,
-                positions: true,
+                positions: {
+                    include: {
+                        departments: true,
+                        salaries: true,
+                    },
+                },
                 user_accounts: true,
                 user_informations: true,
-                work_hours: true,
                 attendances: true,
+                morning_work_hour: true,
+                afternoon_work_hour: true,
             },
         });
     }
@@ -35,11 +42,17 @@ class EmployeeModel {
         return db_1.prisma.employees.findMany({
             include: {
                 cards: true,
-                positions: true,
+                positions: {
+                    include: {
+                        departments: true,
+                        salaries: true,
+                    },
+                },
                 user_accounts: true,
                 user_informations: true,
-                work_hours: true,
                 attendances: true,
+                morning_work_hour: true,
+                afternoon_work_hour: true,
             },
             orderBy: { employee_id: "asc" },
         });
@@ -49,11 +62,17 @@ class EmployeeModel {
             where: { employee_id: employeeId },
             include: {
                 cards: true,
-                positions: true,
+                positions: {
+                    include: {
+                        departments: true,
+                        salaries: true,
+                    },
+                },
                 user_accounts: true,
                 user_informations: true,
-                work_hours: true,
                 attendances: true,
+                morning_work_hour: true,
+                afternoon_work_hour: true,
             },
         });
     }
@@ -63,11 +82,17 @@ class EmployeeModel {
             data,
             include: {
                 cards: true,
-                positions: true,
+                positions: {
+                    include: {
+                        departments: true,
+                        salaries: true,
+                    },
+                },
                 user_accounts: true,
                 user_informations: true,
-                work_hours: true,
                 attendances: true,
+                morning_work_hour: true,
+                afternoon_work_hour: true,
             },
         });
     }

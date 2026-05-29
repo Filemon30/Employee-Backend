@@ -16,19 +16,19 @@ class WorkHourModel {
                 work_hour_id: workHourId,
                 ...data,
             },
-            include: { employees: true },
+            include: { morning_employees: true, afternoon_employees: true },
         });
     }
     static findAll() {
         return db_1.prisma.work_hours.findMany({
-            include: { employees: true },
+            include: { morning_employees: true, afternoon_employees: true },
             orderBy: { work_hour_id: "asc" },
         });
     }
     static findById(workHourId) {
         return db_1.prisma.work_hours.findUnique({
             where: { work_hour_id: workHourId },
-            include: { employees: true },
+            include: { morning_employees: true, afternoon_employees: true },
         });
     }
     static findByTimeRange(timeIn, timeOut) {
@@ -37,7 +37,7 @@ class WorkHourModel {
                 time_in: timeIn,
                 time_out: timeOut,
             },
-            include: { employees: true },
+            include: { morning_employees: true, afternoon_employees: true },
         });
     }
     static findByTimeRangeExcludingId(timeIn, timeOut, workHourId) {
@@ -49,14 +49,14 @@ class WorkHourModel {
                     not: workHourId,
                 },
             },
-            include: { employees: true },
+            include: { morning_employees: true, afternoon_employees: true },
         });
     }
     static updateById(workHourId, data) {
         return db_1.prisma.work_hours.update({
             where: { work_hour_id: workHourId },
             data,
-            include: { employees: true },
+            include: { morning_employees: true, afternoon_employees: true },
         });
     }
     static deleteById(workHourId) {

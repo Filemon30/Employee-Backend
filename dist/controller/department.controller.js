@@ -3,9 +3,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteDepartment = exports.updateDepartment = exports.getDepartmentById = exports.getAllDepartments = exports.createDepartment = void 0;
 const department_model_1 = require("../models/department.model");
 const employee_model_1 = require("../models/employee.model");
-const position_model_1 = require("../models/position.model");
 const db_1 = require("../config/db");
 const http_1 = require("../utils/http");
+const activity_log_1 = require("../utils/activity-log");
+const next_id_1 = require("../utils/next-id");
+const DEPARTMENT_HEAD_POSITION_NAME = "Department Head";
 // SAFE ID PARSER
 const parseId = (rawId) => {
     const id = Number(Array.isArray(rawId) ? rawId[0] : rawId);
@@ -27,29 +29,10 @@ const parseOptionalId = (rawId) => {
     }
     return id;
 };
-const ensureDepartmentHeadEmployeeMatchesDepartment = async (employeeId, departmentId) => {
-    const headEmployee = await employee_model_1.EmployeeModel.findById(employeeId);
-    if (!headEmployee) {
-        throw new http_1.AppError("Department head employee not found.", 404);
-    }
-    if (!headEmployee.position_id) {
-        throw new http_1.AppError("Department head employee must have a position assigned.", 400);
-    }
-    const employeePosition = await position_model_1.PositionModel.findById(headEmployee.position_id);
-    if (!employeePosition || employeePosition.department_id !== departmentId) {
-        throw new http_1.AppError("Department head employee must belong to a position in the same department.", 400);
-    }
-};
-const assignEmployeeToManagerPosition = async (employeeId, departmentId) => {
-    let managerPos = await position_model_1.PositionModel.findByNameAndDepartment("Manager", departmentId);
-    if (!managerPos) {
-        throw new http_1.AppError("Manager position not found for this department.", 404);
-    }
-    await employee_model_1.EmployeeModel.updateById(employeeId, { position_id: managerPos.position_id });
-};
 // CREATE
 exports.createDepartment = (0, http_1.asyncHandler)(async (req, res) => {
     const { department_name, department_head } = req.body;
+    const transactedBy = (0, activity_log_1.getTransactedById)(req);
     if (!department_name) {
         throw new http_1.AppError("Department name is required.", 400);
     }
@@ -63,10 +46,12 @@ exports.createDepartment = (0, http_1.asyncHandler)(async (req, res) => {
         department_name: department_name,
         department_head: parsedDepartmentHead ?? null,
     });
-    // If a department head was provided, ensure they are assigned the Manager position
-    if (typeof parsedDepartmentHead === "number") {
-        await assignEmployeeToManagerPosition(parsedDepartmentHead, department.department_id);
-    }
+    await (0, activity_log_1.logCrudTransaction)({
+        action: "Create",
+        resource: "Department",
+        transactedBy,
+        department_id: department.department_id,
+    });
     res.status(201).json({
         success: true,
         message: "Department created successfully.",
@@ -109,23 +94,20 @@ exports.updateDepartment = (0, http_1.asyncHandler)(async (req, res) => {
             const headEmployee = await employee_model_1.EmployeeModel.findById(parsedDepartmentHead);
             if (!headEmployee)
                 throw new http_1.AppError("Department head not found.", 404);
-            let managerPos = await position_model_1.PositionModel.findByNameAndDepartment("Manager", id);
-            if (!managerPos) {
-                throw new http_1.AppError("Manager position not found for this department.", 404);
-            }
-            // Build transaction steps: reset old head's position, assign new head to Manager, update department
             const transactionSteps = [];
-            // If there's an existing head and it's different from the new head, reset old head's position to null
             if (existing.department_head && existing.department_head !== parsedDepartmentHead) {
                 transactionSteps.push(db_1.prisma.employees.update({ where: { employee_id: existing.department_head }, data: { position_id: null } }));
             }
-            // Update new head's position to Manager
-            transactionSteps.push(db_1.prisma.employees.update({ where: { employee_id: parsedDepartmentHead }, data: { position_id: managerPos.position_id } }));
-            // Update department head
             transactionSteps.push(db_1.prisma.departments.update({ where: { department_id: id }, data: { department_head: parsedDepartmentHead } }));
             // Execute transaction
             await db_1.prisma.$transaction(transactionSteps);
             const updated = await department_model_1.DepartmentModel.findById(id);
+            await (0, activity_log_1.logCrudTransaction)({
+                action: "Update",
+                resource: "Department",
+                transactedBy: (0, activity_log_1.getTransactedById)(req),
+                department_id: id,
+            });
             res.status(200).json({
                 success: true,
                 message: "Department updated successfully.",
@@ -134,7 +116,6 @@ exports.updateDepartment = (0, http_1.asyncHandler)(async (req, res) => {
             return;
         }
         if (parsedDepartmentHead === null) {
-            // If clearing the head, reset the old head's position to null
             const transactionSteps = [];
             if (existing.department_head) {
                 transactionSteps.push(db_1.prisma.employees.update({ where: { employee_id: existing.department_head }, data: { position_id: null } }));
@@ -142,6 +123,12 @@ exports.updateDepartment = (0, http_1.asyncHandler)(async (req, res) => {
             transactionSteps.push(db_1.prisma.departments.update({ where: { department_id: id }, data: { department_head: null } }));
             await db_1.prisma.$transaction(transactionSteps);
             const updated = await department_model_1.DepartmentModel.findById(id);
+            await (0, activity_log_1.logCrudTransaction)({
+                action: "Update",
+                resource: "Department",
+                transactedBy: (0, activity_log_1.getTransactedById)(req),
+                department_id: id,
+            });
             res.status(200).json({
                 success: true,
                 message: "Department updated successfully.",
@@ -151,6 +138,12 @@ exports.updateDepartment = (0, http_1.asyncHandler)(async (req, res) => {
         }
     }
     const department = await department_model_1.DepartmentModel.updateById(id, updateData);
+    await (0, activity_log_1.logCrudTransaction)({
+        action: "Update",
+        resource: "Department",
+        transactedBy: (0, activity_log_1.getTransactedById)(req),
+        department_id: department.department_id,
+    });
     res.status(200).json({
         success: true,
         message: "Department updated successfully.",
@@ -163,9 +156,25 @@ exports.deleteDepartment = (0, http_1.asyncHandler)(async (req, res) => {
     if (!existing) {
         throw new http_1.AppError("Department not found.", 404);
     }
-    await department_model_1.DepartmentModel.deleteById(id);
+    await db_1.prisma.$transaction(async (tx) => {
+        const actorId = (0, activity_log_1.getTransactedById)(req);
+        const txId = await (0, next_id_1.nextIdFromMax)(async () => {
+            const result = await tx.transactions.aggregate({ _max: { transaction_id: true } });
+            return result._max.transaction_id;
+        });
+        await tx.transactions.create({
+            data: {
+                transaction_id: txId,
+                transaction_type: 'Department Deleted',
+                transacted_by: actorId,
+                reference_type: 'Department',
+                department_id: existing.department_id,
+            }
+        });
+        await department_model_1.DepartmentModel.deleteById(id);
+    });
     res.status(200).json({
         success: true,
-        message: "Department deleted successfully."
+        message: "Department deleted successfully.",
     });
 });

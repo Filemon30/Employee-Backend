@@ -16,54 +16,22 @@ class TransactionModel {
                 transaction_id: transactionId,
                 ...data,
             },
-            include: {
-                department: true,
-                position: true,
-                salary: true,
-                work_hour: true,
-                employees_transactions_employee_idToemployees: true,
-                employees_transactions_transacted_byToemployees: true,
-            },
         });
     }
     static findAll() {
         return db_1.prisma.transactions.findMany({
-            include: {
-                department: true,
-                position: true,
-                salary: true,
-                work_hour: true,
-                employees_transactions_employee_idToemployees: true,
-                employees_transactions_transacted_byToemployees: true,
-            },
             orderBy: { transaction_id: "desc" },
         });
     }
     static findById(transactionId) {
         return db_1.prisma.transactions.findUnique({
             where: { transaction_id: transactionId },
-            include: {
-                department: true,
-                position: true,
-                salary: true,
-                work_hour: true,
-                employees_transactions_employee_idToemployees: true,
-                employees_transactions_transacted_byToemployees: true,
-            },
         });
     }
     static updateById(transactionId, data) {
         return db_1.prisma.transactions.update({
             where: { transaction_id: transactionId },
             data,
-            include: {
-                department: true,
-                position: true,
-                salary: true,
-                work_hour: true,
-                employees_transactions_employee_idToemployees: true,
-                employees_transactions_transacted_byToemployees: true,
-            },
         });
     }
     static deleteById(transactionId) {

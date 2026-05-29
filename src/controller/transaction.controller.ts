@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { prisma } from "../config/db";
 import { TransactionModel } from "../models/transaction.model";
 import { AppError, asyncHandler } from "../utils/http";
 
@@ -17,57 +18,76 @@ const parseId = (rawId: unknown): number => {
 export const getAllTransactions = asyncHandler(
   async (req: Request, res: Response) => {
     const transactions = await TransactionModel.findAll();
+    const transactedByIds = Array.from(
+      new Set(transactions.map((transaction) => transaction.transacted_by))
+    );
+
+    const transactedByEmployees = await prisma.employees.findMany({
+      where: { employee_id: { in: transactedByIds } },
+      include: { user_informations: true },
+    });
+
+    const employeesById = new Map(
+      transactedByEmployees.map((employee) => [employee.employee_id, employee])
+    );
 
     // Format the data for the frontend
     const formattedTransactions = transactions.map((transaction) => {
-      const transactedByEmployee = transaction.employees_transactions_transacted_byToemployees;
-      const processedBy = transactedByEmployee
-        ? `${transactedByEmployee.user_informations?.last_name || ''}, ${transactedByEmployee.user_informations?.first_name || ''}`.trim()
-        : 'Unknown';
+      const employee = employeesById.get(transaction.transacted_by);
+      let processedBy = "Unknown";
 
-      // Format transaction date
+      if (employee?.user_informations) {
+        processedBy = `${employee.user_informations.last_name || ""}, ${employee.user_informations.first_name || ""}`.trim();
+      } else if ((transaction.reference_type || "").toLowerCase() === "employee") {
+        processedBy = "Deleted Employee";
+      }
+
       const transactionDate = transaction.transaction_date
         ? new Date(transaction.transaction_date)
         : new Date();
 
-      const dateFormatted = transactionDate.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
+      const dateFormatted = transactionDate.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
       });
 
-      const dateValue = transactionDate.toISOString().split('T')[0];
+      const dateValue = transactionDate.toISOString().split("T")[0];
 
-      // Determine reference type and ID
-      let referenceType = 'transaction';
+      const refTypeRaw = (transaction.reference_type || "").toLowerCase();
+      let referenceType = "transaction";
       let referenceId = transaction.transaction_id;
 
-      if (transaction.employee_id) {
-        referenceType = 'employee';
-        referenceId = transaction.employee_id;
-      } else if (transaction.position_id) {
-        referenceType = 'position';
-        referenceId = transaction.position_id;
-      } else if (transaction.department_id) {
-        referenceType = 'department';
-        referenceId = transaction.department_id;
-      } else if (transaction.salary_id) {
-        referenceType = 'salary';
-        referenceId = transaction.salary_id;
-      } else if (transaction.work_hour_id) {
-        referenceType = 'work-hour';
-        referenceId = transaction.work_hour_id;
+      if (refTypeRaw === "employee") {
+        referenceType = "employee";
+        referenceId = transaction.employee_id ?? transaction.transaction_id;
+      } else if (refTypeRaw === "position" || transaction.position_id) {
+        referenceType = "position";
+        referenceId = transaction.position_id ?? transaction.transaction_id;
+      } else if (refTypeRaw === "department" || transaction.department_id) {
+        referenceType = "department";
+        referenceId = transaction.department_id ?? transaction.transaction_id;
+      } else if (refTypeRaw === "salary" || transaction.salary_id) {
+        referenceType = "salary";
+        referenceId = transaction.salary_id ?? transaction.transaction_id;
+      } else if (
+        refTypeRaw === "work hour" ||
+        refTypeRaw === "work-hour" ||
+        transaction.work_hour_id
+      ) {
+        referenceType = "work-hour";
+        referenceId = transaction.work_hour_id ?? transaction.transaction_id;
       }
 
       return {
-        transactionNo: String(transaction.transaction_id).padStart(8, '0'),
+        transactionNo: String(transaction.transaction_id).padStart(8, "0"),
         processedBy,
         classification: transaction.transaction_type,
-        referenceNo: String(referenceId).padStart(8, '0'),
+        referenceNo: String(referenceId).padStart(8, "0"),
         referenceType,
         referenceId,
         date: dateFormatted,
-        dateValue
+        dateValue,
       };
     });
 

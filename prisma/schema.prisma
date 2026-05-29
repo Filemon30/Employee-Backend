@@ -37,7 +37,6 @@ model departments {
   department_head          Int?
   department_head_employee employees?     @relation("DepartmentHead", fields: [department_head], references: [employee_id], onUpdate: NoAction)
   positions                positions[]
-  transactions             transactions[]
 }
 
 model employees {
@@ -46,18 +45,16 @@ model employees {
   card_id                                            Int?              @unique
   acc_id                                             Int               @unique
   info_id                                            Int               @unique
-  morning_work_hour_id                               Int?
   afternoon_work_hour_id                             Int?
+  morning_work_hour_id                               Int?
   attendances                                        attendances[]
   departments_headed                                 departments[]     @relation("DepartmentHead")
   user_accounts                                      user_accounts     @relation(fields: [acc_id], references: [acc_id], onDelete: Cascade, onUpdate: NoAction)
+  afternoon_work_hour                                work_hours?       @relation("AfternoonWorkHour", fields: [afternoon_work_hour_id], references: [work_hour_id], onDelete: NoAction, onUpdate: NoAction)
   cards                                              cards?            @relation(fields: [card_id], references: [card_id], onDelete: Cascade, onUpdate: NoAction)
   user_informations                                  user_informations @relation(fields: [info_id], references: [info_id], onDelete: Cascade, onUpdate: NoAction)
-  positions                                          positions?        @relation(fields: [position_id], references: [position_id], onDelete: NoAction, onUpdate: NoAction)
   morning_work_hour                                  work_hours?       @relation("MorningWorkHour", fields: [morning_work_hour_id], references: [work_hour_id], onDelete: NoAction, onUpdate: NoAction)
-  afternoon_work_hour                                work_hours?       @relation("AfternoonWorkHour", fields: [afternoon_work_hour_id], references: [work_hour_id], onDelete: NoAction, onUpdate: NoAction)
-  transactions_transactions_employee_idToemployees   transactions[]    @relation("transactions_employee_idToemployees")
-  transactions_transactions_transacted_byToemployees transactions[]    @relation("transactions_transacted_byToemployees")
+  positions                                          positions?        @relation(fields: [position_id], references: [position_id], onDelete: NoAction, onUpdate: NoAction)
 }
 
 model positions {
@@ -68,7 +65,6 @@ model positions {
   employees     employees[]
   departments   departments    @relation(fields: [department_id], references: [department_id], onDelete: Cascade, onUpdate: NoAction)
   salaries      salaries       @relation(fields: [salary_id], references: [salary_id], onDelete: NoAction, onUpdate: NoAction)
-  transactions  transactions[]
 
   @@unique([department_id, position_name])
 }
@@ -76,28 +72,21 @@ model positions {
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model salaries {
   salary_id    Int            @id
-  amount       Decimal        @db.Decimal(10, 2)
+  amount       Decimal        @unique(map: "unique_salary_amount") @db.Decimal(10, 2)
   positions    positions[]
-  transactions transactions[]
 }
 
 model transactions {
-  transaction_id                                  Int          @id
-  transaction_type                                String       @db.VarChar(80)
-  transacted_by                                   Int
-  reference_type                                  String       @db.VarChar(30)
-  department_id                                   Int?
-  position_id                                     Int?
-  salary_id                                       Int?
-  work_hour_id                                    Int?
-  employee_id                                     Int?
-  transaction_date                                DateTime?    @default(now()) @db.Timestamp(6)
-  department                                      departments? @relation(fields: [department_id], references: [department_id], onDelete: NoAction, onUpdate: NoAction)
-  employees_transactions_employee_idToemployees   employees?   @relation("transactions_employee_idToemployees", fields: [employee_id], references: [employee_id], onDelete: NoAction, onUpdate: NoAction)
-  position                                        positions?   @relation(fields: [position_id], references: [position_id], onDelete: NoAction, onUpdate: NoAction)
-  salary                                          salaries?    @relation(fields: [salary_id], references: [salary_id], onDelete: NoAction, onUpdate: NoAction)
-  employees_transactions_transacted_byToemployees employees    @relation("transactions_transacted_byToemployees", fields: [transacted_by], references: [employee_id], onDelete: NoAction, onUpdate: NoAction)
-  work_hour                                       work_hours?  @relation(fields: [work_hour_id], references: [work_hour_id], onDelete: NoAction, onUpdate: NoAction)
+  transaction_id   Int       @id
+  transaction_type String    @db.VarChar(80)
+  transacted_by    Int
+  reference_type   String    @db.VarChar(30)
+  department_id    Int?
+  position_id      Int?
+  salary_id        Int?
+  work_hour_id     Int?
+  employee_id      Int?
+  transaction_date DateTime? @default(now()) @db.Timestamp(6)
 
   @@index([transaction_date], map: "idx_transaction_date")
 }
@@ -127,14 +116,13 @@ model user_informations {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model work_hours {
-  work_hour_id         Int            @id
-  time_in              String         @db.VarChar(20)
-  time_out             String         @db.VarChar(20)
-  classification       String?        @db.VarChar(20)
-  lunch_break_minutes  Int?
-  morning_employees    employees[]     @relation("MorningWorkHour")
-  afternoon_employees  employees[]     @relation("AfternoonWorkHour")
-  transactions         transactions[]
+  work_hour_id        Int            @id
+  time_in             String         @db.VarChar(20)
+  time_out            String         @db.VarChar(20)
+  lunch_break_minutes Int?
+  classification      String?        @db.VarChar(20)
+  afternoon_employees employees[]    @relation("AfternoonWorkHour")
+  morning_employees   employees[]    @relation("MorningWorkHour")
 }
 
 enum attendance_status_enum {

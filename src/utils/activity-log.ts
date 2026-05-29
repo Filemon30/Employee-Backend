@@ -16,7 +16,10 @@ const parseRequiredId = (rawId: unknown, fieldName: string): number => {
 };
 
 export const getTransactedById = (req: Request): number => {
-  return parseRequiredId(req.body?.transacted_by ?? req.query.transacted_by, "transacted_by");
+  return parseRequiredId(
+    req.body?.transacted_by ?? req.query.transacted_by ?? req.headers["x-transacted-by"],
+    "transacted_by",
+  );
 };
 
 type LogCrudTransactionInput = {

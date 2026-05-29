@@ -576,15 +576,27 @@ export const deleteEmployee = asyncHandler(
     }
 
     await prisma.$transaction(async (tx) => {
-      await tx.transactions.deleteMany({
-        where: {
-          OR: [
-            { employee_id: id },
-            { transacted_by: id },
-          ],
+      const actorId = getTransactedById(req);
+
+      // Create a transaction record for this delete action within the same transaction
+      const txId = await nextIdFromMax(async () => {
+        const result = await tx.transactions.aggregate({ _max: { transaction_id: true } });
+        return result._max.transaction_id;
+      });
+
+      await tx.transactions.create({
+        data: {
+          transaction_id: txId,
+          transaction_type: 'Employee Delete',
+          transacted_by: actorId,
+          reference_type: 'Employee',
+          department_id: existing.positions?.department_id ?? undefined,
+          position_id: existing.position_id ?? undefined,
+          employee_id: existing.employee_id,
         },
       });
 
+      // Safe to delete the employee record now.
       await tx.employees.delete({
         where: { employee_id: id },
       });
@@ -608,16 +620,7 @@ export const deleteEmployee = asyncHandler(
       }
     });
 
-    await logCrudTransaction({
-      action: "Delete",
-      resource: "Employee",
-      transactedBy: getTransactedById(req),
-      department_id: existing.positions?.department_id,
-      position_id: existing.position_id ?? undefined,
-      work_hour_id:
-        existing.morning_work_hour_id ?? existing.afternoon_work_hour_id ?? undefined,
-      employee_id: id,
-    });
+    // Delete already logged inside DB transaction to preserve references and avoid FK issues.
 
     res.status(200).json({
       success: true,

@@ -5,8 +5,11 @@ const db_1 = require("./config/db");
 const env_1 = require("./config/env");
 const startServer = async () => {
     await (0, db_1.connectDatabase)();
-    app_1.app.listen(env_1.env.port, () => {
-        console.log(`Server running on http://localhost:${env_1.env.port}`);
+    // app.listen(env.port, () => {
+    //   console.log(`Server running on http://localhost:${env.port}`);
+    // });
+    app_1.app.listen(env_1.env.port, '0.0.0.0', () => {
+        console.log(`Server running on port ${env_1.env.port}`);
     });
 };
 startServer().catch(async (error) => {

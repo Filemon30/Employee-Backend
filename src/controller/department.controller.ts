@@ -5,6 +5,8 @@ import { PositionModel } from "../models/position.model";
 import { prisma } from "../config/db";
 import { AppError, asyncHandler } from "../utils/http";
 import { getTransactedById, logCrudTransaction } from "../utils/activity-log";
+import { nextIdFromMax } from "../utils/next-id";
+import { generateRandomId } from "../utils/idGenerator/id-generator";
 
 const DEPARTMENT_HEAD_POSITION_NAME = "Department Head";
 
@@ -37,92 +39,6 @@ const parseOptionalId = (rawId: unknown): number | null | undefined => {
   return id;
 };
 
-const ensureDepartmentHeadEmployeeMatchesDepartment = async (
-  employeeId: number,
-  departmentId: number
-) => {
-  const headEmployee = await EmployeeModel.findById(employeeId);
-
-  if (!headEmployee) {
-    throw new AppError("Department head employee not found.", 404);
-  }
-
-  if (!headEmployee.position_id) {
-    throw new AppError(
-      "Department head employee must have a position assigned.",
-      400
-    );
-  }
-
-  const employeePosition = await PositionModel.findById(headEmployee.position_id);
-
-  if (!employeePosition || employeePosition.department_id !== departmentId) {
-    throw new AppError(
-      "Department head employee must belong to a position in the same department.",
-      400
-    );
-  }
-};
-
-const resolveDepartmentHeadSalaryId = async (departmentId: number) => {
-  const existingDepartmentHeadPosition = await PositionModel.findByNameAndDepartment(
-    DEPARTMENT_HEAD_POSITION_NAME,
-    departmentId
-  );
-
-  if (existingDepartmentHeadPosition) {
-    return existingDepartmentHeadPosition.salary_id;
-  }
-
-  const firstDepartmentPosition = await prisma.positions.findFirst({
-    where: { department_id: departmentId },
-    orderBy: { position_id: "asc" },
-    select: { salary_id: true },
-  });
-
-  if (firstDepartmentPosition?.salary_id) {
-    return firstDepartmentPosition.salary_id;
-  }
-
-  const fallbackSalary = await prisma.salaries.findFirst({
-    orderBy: { salary_id: "asc" },
-    select: { salary_id: true },
-  });
-
-  if (!fallbackSalary?.salary_id) {
-    throw new AppError("No salary record available to create Department Head position.", 400);
-  }
-
-  return fallbackSalary.salary_id;
-};
-
-const ensureDepartmentHeadPosition = async (departmentId: number) => {
-  const existing = await PositionModel.findByNameAndDepartment(
-    DEPARTMENT_HEAD_POSITION_NAME,
-    departmentId
-  );
-
-  if (existing) {
-    return existing;
-  }
-
-  const salaryId = await resolveDepartmentHeadSalaryId(departmentId);
-
-  return PositionModel.create({
-    department_id: departmentId,
-    position_name: DEPARTMENT_HEAD_POSITION_NAME,
-    salary_id: salaryId,
-  });
-};
-
-const syncDepartmentHeadPositions = async (departments: Array<{ department_id: number }>) => {
-  await Promise.all(
-    departments.map(async (department) => {
-      await ensureDepartmentHeadPosition(department.department_id);
-    })
-  );
-};
-
 
 // CREATE
 export const createDepartment = asyncHandler(
@@ -146,8 +62,6 @@ export const createDepartment = asyncHandler(
       department_head: parsedDepartmentHead ?? null,
     });
 
-    await ensureDepartmentHeadPosition(department.department_id);
-
     await logCrudTransaction({
       action: "Create",
       resource: "Department",
@@ -168,14 +82,10 @@ export const getAllDepartments = asyncHandler(
   async (req: Request, res: Response) => {
     const departments = await DepartmentModel.findAll();
 
-    await syncDepartmentHeadPositions(departments);
-
-    const refreshedDepartments = await DepartmentModel.findAll();
-
     res.status(200).json({
       success: true,
       message: "Departments retrieved successfully.",
-      data: refreshedDepartments,
+      data: departments,
     });
   }
 );
@@ -190,14 +100,10 @@ export const getDepartmentById = asyncHandler (
       throw new AppError("Department not found.", 404);
     }
 
-    await ensureDepartmentHeadPosition(id);
-
-    const refreshedDepartment = await DepartmentModel.findById(id);
-
     res.status(200).json({
       success: true,
       message: "Department retrieved successfully.",
-      data: refreshedDepartment,
+      data: department,
     });
   }
 );
@@ -310,26 +216,39 @@ export const updateDepartment = asyncHandler(
 export const deleteDepartment = asyncHandler(
   async (req: Request, res: Response) => {
     const id = parseId(req.params.id);
+
     const existing = await DepartmentModel.findById(id);
 
-    if (!existing) {
+    if(!existing) {
       throw new AppError("Department not found.", 404);
     }
 
-    await DepartmentModel.deleteById(id);
+    await prisma.$transaction(async (tx) => {
+      const actorId = getTransactedById(req);
 
-    await logCrudTransaction({
-      action: "Delete",
-      resource: "Department",
-      transactedBy: getTransactedById(req),
-      department_id: id,
+      const txId = await nextIdFromMax(async () => {
+        const result = await tx.transactions.aggregate({_max: { transaction_id: true } })
+        return result._max.transaction_id;
+      });
+
+      await tx.transactions.create({
+        data: {
+          transaction_id: txId,
+          transaction_type: 'Department Deleted',
+          transacted_by: actorId,
+          reference_type: 'Department',
+          department_id: existing.department_id,
+        }
+      });
+
+      await DepartmentModel.deleteById(id);
+    
     });
 
-    res.status(200).json({ 
+    res.status(200).json({
       success: true,
-      message: "Department deleted successfully." 
+      message: "Department deleted successfully.",
     });
+
   }
 );
-
-

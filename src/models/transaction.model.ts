@@ -30,43 +30,11 @@ export class TransactionModel {
         transaction_id: transactionId,
         ...data,
       },
-      include: {
-        department: true,
-        position: true,
-        salary: true,
-        work_hour: true,
-        employees_transactions_employee_idToemployees: {
-          include: {
-            user_informations: true,
-          },
-        },
-        employees_transactions_transacted_byToemployees: {
-          include: {
-            user_informations: true,
-          },
-        },
-      },
     });
   }
 
   static findAll() {
     return prisma.transactions.findMany({
-      include: {
-        department: true,
-        position: true,
-        salary: true,
-        work_hour: true,
-        employees_transactions_employee_idToemployees: {
-          include: {
-            user_informations: true,
-          },
-        },
-        employees_transactions_transacted_byToemployees: {
-          include: {
-            user_informations: true,
-          },
-        },
-      },
       orderBy: { transaction_id: "desc" },
     });
   }
@@ -74,22 +42,6 @@ export class TransactionModel {
   static findById(transactionId: number) {
     return prisma.transactions.findUnique({
       where: { transaction_id: transactionId },
-      include: {
-        department: true,
-        position: true,
-        salary: true,
-        work_hour: true,
-        employees_transactions_employee_idToemployees: {
-          include: {
-            user_informations: true,
-          },
-        },
-        employees_transactions_transacted_byToemployees: {
-          include: {
-            user_informations: true,
-          },
-        },
-      },
     });
   }
 
@@ -97,22 +49,6 @@ export class TransactionModel {
     return prisma.transactions.update({
       where: { transaction_id: transactionId },
       data,
-      include: {
-        department: true,
-        position: true,
-        salary: true,
-        work_hour: true,
-        employees_transactions_employee_idToemployees: {
-          include: {
-            user_informations: true,
-          },
-        },
-        employees_transactions_transacted_byToemployees: {
-          include: {
-            user_informations: true,
-          },
-        },
-      },
     });
   }
 

@@ -305,15 +305,6 @@ export const deleteWorkHour = asyncHandler(
 				},
 			});
 
-			await tx.transactions.updateMany({
-				where: {
-					work_hour_id: id,
-				},
-				data: {
-					work_hour_id: null,
-				},
-			});
-
 			await tx.work_hours.delete({
 				where: { work_hour_id: id },
 			});

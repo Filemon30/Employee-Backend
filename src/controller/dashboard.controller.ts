@@ -120,22 +120,26 @@ export const dashboardController = {
   }),
 
   getRecentTransactions: asyncHandler(async (_req: Request, res: Response) => {
-    // Fetch recent transactions
     const transactions = await prisma.transactions.findMany({
-      include: {
-        employees_transactions_transacted_byToemployees: {
-          include: {
-            user_informations: true,
-          },
-        },
-      },
       orderBy: {
         transaction_date: "desc",
       },
       take: 5,
     });
 
-    // Format the response
+    const transactedByIds = Array.from(
+      new Set(transactions.map((transaction) => transaction.transacted_by))
+    );
+
+    const transactedByEmployees = await prisma.employees.findMany({
+      where: { employee_id: { in: transactedByIds } },
+      include: { user_informations: true },
+    });
+
+    const employeesById = new Map(
+      transactedByEmployees.map((employee) => [employee.employee_id, employee])
+    );
+
     const formattedTransactions = transactions.map((transaction) => {
       const dateTime = transaction.transaction_date?.toLocaleString("en-US", {
         month: "short",
@@ -147,11 +151,11 @@ export const dashboardController = {
         hour12: true,
       }) || "N/A";
 
-      const transactedBy = transaction.employees_transactions_transacted_byToemployees;
+      const transactedBy = employeesById.get(transaction.transacted_by);
       const firstName = transactedBy?.user_informations?.first_name || "Unknown";
 
       return {
-        reference: `${transaction.transaction_id}`.padStart(6, "0"),
+        reference: `${transaction.transaction_id}`.padStart(8, "0"),
         type: transaction.transaction_type,
         firstName,
         dateTime,
