@@ -3,7 +3,7 @@ services:
     name: employee-backend
     runtime: node
     plan: free
-    buildCommand: npm ci && npm run render-build
+    buildCommand: npm ci --include=dev && npm run render-build
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
