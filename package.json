@@ -8,7 +8,7 @@
     "build": "tsc",
     "render-build": "npm run build",
     "start": "node dist/server.js",
-    "start:render": "npx prisma migrate deploy && node dist/server.js",
+    "start:render": "bash scripts/render-start.sh",
     "postinstall": "prisma generate"
   },
   "keywords": [],
