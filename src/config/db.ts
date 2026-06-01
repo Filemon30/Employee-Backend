@@ -3,8 +3,14 @@ import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
 import { env } from "./env";
 
+const useSsl =
+  env.nodeEnv === "production" ||
+  env.databaseUrl.includes("render.com") ||
+  env.databaseUrl.includes("sslmode=require");
+
 const pool = new Pool({
   connectionString: env.databaseUrl,
+  ssl: useSsl ? { rejectUnauthorized: false } : undefined,
 });
 
 const adapter = new PrismaPg(pool);
