@@ -9,7 +9,10 @@
     "render-build": "npm run build",
     "start": "node dist/server.js",
     "start:render": "bash scripts/render-start.sh",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:migrate": "prisma migrate deploy"
   },
   "keywords": [],
   "author": "",
